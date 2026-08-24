@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package axiom.v1;
+
+// LLM gateway contract. REST/SSE remains the public surface; this proto is the
+// internal service-to-service contract (spec section 3).
+
+message ChatMessage {
+  string role = 1;
+  string content = 2;
+  optional string tool_call_id = 3;
+  optional string name = 4;
+}
+
+message ToolDefinition {
+  string name = 1;
+  optional string description = 2;
+  bytes parameters_json_schema = 3; // serialized JSON Schema
+}
+
+message ChatCompletionRequest {
+  string model = 1;
+  repeated ChatMessage messages = 2;
+  repeated ToolDefinition tools = 3;
+  optional double temperature = 4;
+  optional double top_p = 5;
+  optional uint32 max_tokens = 6;
+  repeated string stop_sequences = 7;
+  bool stream = 8;
+  string request_id = 9;
+  // Verified tenant context; never accepted from callers.
+  TenantContext tenant = 20;
+}
+
+message Usage {
+  uint32 prompt_tokens = 1;
+  uint32 completion_tokens = 2;
+  uint32 total_tokens = 3;
+}
+
+message ChatCompletionResponse {
+  string id = 1;
+  string model = 2;
+  int64 created = 3;
+  ChatMessage message = 4;
+  Usage usage = 5;
+  string finish_reason = 6;
+}
+
+message StreamChunk {
+  string id = 1;
+  string model = 2;
+  int64 created = 3;
+  string delta_role = 4;
+  string delta_content = 5;
+  optional string finish_reason = 6;
+  optional Usage usage = 7;
+}
+
+message ListModelsRequest {}
+
+message ModelInfo {
+  string id = 1;
+  string provider = 2;
+  uint32 context_window_tokens = 3;
+  uint32 max_output_tokens = 4;
+  bool supports_streaming = 5;
+  bool supports_tools = 6;
+}
+
+message ListModelsResponse {
+  repeated ModelInfo models = 1;
+}
+
+message TenantContext {
+  string tenant_id = 1;
+  string project_id = 2;
+}
+
+service GatewayService {
+  rpc ChatCompletion(ChatCompletionRequest) returns (ChatCompletionResponse);
+  rpc ChatCompletionStream(ChatCompletionRequest) returns (stream StreamChunk);
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+}

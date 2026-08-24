@@ -1,0 +1,14 @@
+# Codegen configuration for protobuf clients/servers.
+#
+# TypeScript generation uses @bufbuild/protoc-gen-es (add as a devDependency
+# when the first gRPC transport consumer lands, Phase 1+); Python stubs are
+# generated with `python -m grpc_tools.protoc`. Protos committed here are the
+# source of truth; generated code is never hand-edited.
+version: v2
+managed:
+  enabled: true
+plugins:
+  - remote: buf.build/bufbuild/es
+    out: src/generated/proto
+    opt:
+      - target=ts
