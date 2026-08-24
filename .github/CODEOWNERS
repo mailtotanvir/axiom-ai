@@ -1,0 +1,10 @@
+# Project governance is defined in GOVERNANCE.md at the repository root.
+# During the build phase this workspace is the single source; at release,
+# each extracted repo sets CODEOWNERS to its area maintainers.
+*                               @axiom-ai/maintainers
+/packages/core-shared/          @axiom-ai/maintainers @axiom-ai/platform-leads
+/services/gateway/              @axiom-ai/maintainers
+/services/rag-pipeline/         @axiom-ai/maintainers
+/services/agent-runtime/        @axiom-ai/maintainers
+/services/ops-observability/    @axiom-ai/maintainers
+/docs/adr/                      @axiom-ai/maintainers @axiom-ai/platform-leads
