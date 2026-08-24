@@ -27,6 +27,11 @@ import {
   type MeterSink,
 } from "./metering/sinks.js";
 import { PassThroughGuardrails, type GuardrailHook } from "./guardrails/guardrails.js";
+import {
+  InMemoryCacheStore,
+  InputCache,
+  RedisCacheStore,
+} from "./cache/inputCache.js";
 
 import type { GatewayConfig } from "./config.js";
 
@@ -39,6 +44,8 @@ export interface GatewayRuntime {
   keyStore: ApiKeyStore;
   sinks: MeterSink[];
   guardrails: GuardrailHook;
+  inputCache: InputCache;
+  anthropicAutoSystemCache: boolean;
   redis?: RedisClient;
   close: () => Promise<void>;
 }
@@ -65,6 +72,8 @@ export async function buildRuntime(config: GatewayConfig): Promise<GatewayRuntim
   const anthropic = new AnthropicAdapter(
     keys.ANTHROPIC_API_KEY,
     config.GATEWAY_UPSTREAM_TIMEOUT_MS,
+    fetch,
+    config.GATEWAY_ANTHROPIC_AUTO_SYSTEM_CACHE,
   );
   if (anthropic.isConfigured()) {
     adapters.set(anthropic.id, anthropic);
@@ -100,6 +109,18 @@ export async function buildRuntime(config: GatewayConfig): Promise<GatewayRuntim
     limiter = new InMemoryRateLimiter(tierLimitsOf(config));
   }
 
+  const cacheOptions = {
+    enabled: config.GATEWAY_INPUT_CACHE.enabled,
+    ttlSeconds: config.GATEWAY_INPUT_CACHE.ttlSeconds,
+    maxEntryBytes: config.GATEWAY_INPUT_CACHE.maxEntryBytes,
+  };
+  const inputCache = new InputCache(
+    redis !== undefined
+      ? new RedisCacheStore(redis, new InMemoryCacheStore())
+      : new InMemoryCacheStore(),
+    cacheOptions,
+  );
+
   let keyStore: ApiKeyStore = new InMemoryApiKeyStore();
   if (config.POSTGRES_DB_URI !== undefined) {
     const pgStore = new PostgresApiKeyStore(config.POSTGRES_DB_URI);
@@ -128,6 +149,8 @@ export async function buildRuntime(config: GatewayConfig): Promise<GatewayRuntim
     keyStore,
     sinks,
     guardrails,
+    inputCache,
+    anthropicAutoSystemCache: config.GATEWAY_ANTHROPIC_AUTO_SYSTEM_CACHE,
     redis,
     close: async () => {
       await Promise.allSettled(sinks.map((sink) => sink.flush()));

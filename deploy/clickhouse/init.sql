@@ -18,7 +18,14 @@ CREATE TABLE IF NOT EXISTS axiom.metering_usage_events
     reconciliation_delta Int64,
     cost_usd             Float64,
     latency_ms           UInt32,
-    upstream_status      UInt16
+    upstream_status      UInt16,
+    -- Provider-native prompt caching (OpenAI cached_tokens, Anthropic
+    -- cache_creation/cache_read).
+    cached_input_tokens  UInt64 DEFAULT 0,
+    cache_write_tokens   UInt64 DEFAULT 0,
+    cache_read_tokens    UInt64 DEFAULT 0,
+    -- Gateway-level exact-match input cache outcome.
+    cache_hit            UInt8 DEFAULT 0
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(timestamp)

@@ -16,6 +16,36 @@ Node 20+ / Fastify on **:3000**.
 | G6 | tiktoken estimation reconciled against provider-reported usage; batched ClickHouse sink (+console in dev); per-model cost rollups | `src/metering/` |
 | G7 | Guardrail hook chain (pass-through default; Presidio/NeMo land Phase 5) | `src/guardrails/` |
 
+## Input caching
+
+The gateway ships an **exact-match input cache** that works identically for
+the OpenAI-compatible family and Anthropic:
+
+- Identical requests (same tenant + model + messages + tools + sampling
+  parameters) are served from a stored response — byte-for-byte for SSE —
+  with no upstream call. Responses carry `x-axiom-cache: HIT`; concurrent
+  duplicate misses collapse into a single upstream call (`DEDUPED`).
+- Keys hash the tenant id, so cross-tenant hits are impossible.
+- Tool-calling requests are excluded by default (nondeterministic results).
+- Storage: Redis with TTL when `REDIS_PRIMARY_URL` is set, in-memory otherwise;
+  entries above `maxEntryBytes` are never stored.
+
+```bash
+# second identical call is answered from cache
+curl -i -X POST localhost:3000/v1/chat/completions ... # x-axiom-cache: MISS
+curl -i -X POST localhost:3000/v1/chat/completions ... # x-axiom-cache: HIT
+```
+
+### Provider-native prompt caching
+
+| Family | Mechanism | Metering |
+|--------|-----------|----------|
+| OpenAI-compatible | Automatic upstream-side caching. Optional `prompt_cache_key` hint is forwarded to the `openai` provider only. | `prompt_tokens_details.cached_tokens` billed at 0.5x input price |
+| Anthropic | Client marks messages/system with `"cache_control": "ephemeral"`; the gateway translates them into content blocks. Set `GATEWAY_ANTHROPIC_AUTO_SYSTEM_CACHE=true` to mark the trailing system block automatically. | `cache_read_input_tokens` at 0.1x, `cache_creation_input_tokens` at 1.25x |
+
+All cache counters (`cached_input_tokens`, `cache_write_tokens`,
+`cache_read_tokens`, `cache_hit`) are recorded per request in ClickHouse.
+
 ## Run
 
 ```bash

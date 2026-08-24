@@ -19,6 +19,7 @@ import { CircuitBreaker } from "../src/router/circuitBreaker.js";
 import { InMemoryRateLimiter } from "../src/ratelimit/rateLimiter.js";
 import { InMemoryApiKeyStore } from "../src/auth/apiKeyStore.js";
 import { PassThroughGuardrails } from "../src/guardrails/guardrails.js";
+import { InMemoryCacheStore, InputCache } from "../src/cache/inputCache.js";
 import { buildApp } from "../src/app.js";
 import type { GatewayRuntime } from "../src/runtime.js";
 import { MockUpstream } from "./helpers/mockUpstream.js";
@@ -43,7 +44,13 @@ interface Harness {
 
 const openHandles: Harness[] = [];
 
-async function harness(): Promise<Harness> {
+async function harness(
+  inputCache: InputCache = new InputCache(new InMemoryCacheStore(), {
+    enabled: false,
+    ttlSeconds: 60,
+    maxEntryBytes: 1024 * 1024,
+  }),
+): Promise<Harness> {
   const providers: MockUpstream[] = [];
   for (let i = 0; i < 3; i += 1) {
     const upstream = new MockUpstream();
@@ -83,6 +90,8 @@ async function harness(): Promise<Harness> {
     keyStore,
     sinks: [sink],
     guardrails: new PassThroughGuardrails(),
+    inputCache,
+    anthropicAutoSystemCache: false,
     close: async () => undefined,
   };
 

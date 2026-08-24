@@ -36,7 +36,10 @@ interface WireChatResponse {
 }
 
 /** Unified (camelCase) request → OpenAI wire (snake_case). */
-export function toWireRequest(body: ChatCompletionRequest): Record<string, unknown> {
+export function toWireRequest(
+  body: ChatCompletionRequest,
+  providerId?: ProviderId,
+): Record<string, unknown> {
   const wire: Record<string, unknown> = {
     model: body.model,
     messages: body.messages.map((message) => ({
@@ -64,6 +67,11 @@ export function toWireRequest(body: ChatCompletionRequest): Record<string, unkno
   if (wire.stream === true) {
     // Ask every compatible upstream for usage totals inside the final chunk.
     wire.stream_options = { include_usage: true };
+  }
+  // Prompt-cache routing hint is OpenAI-specific; strict providers reject
+  // unknown fields, so it is only forwarded where supported.
+  if (body.promptCacheKey !== undefined && providerId === "openai") {
+    wire.prompt_cache_key = body.promptCacheKey;
   }
   return wire;
 }
@@ -158,7 +166,7 @@ export class OpenAiCompatibleAdapter implements ProviderAdapter {
           accept: call.body.stream === true ? "text/event-stream" : "application/json",
           ...call.headers,
         },
-        body: JSON.stringify(toWireRequest(call.body)),
+        body: JSON.stringify(toWireRequest(call.body, this.id)),
       });
 
       if (!response.ok) {

@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import type { FastifyError, FastifyInstance, FastifyReply } from "fastify";
 
-import { AxiomError, CORE_VERSION, errors, initTelemetry } from "@axiom-ai/core";
+import { AxiomError, CORE_VERSION, errors, initTelemetry, type TelemetryHandle } from "@axiom-ai/core";
 
 import type { GatewayConfig } from "./config.js";
 import { buildRuntime, seedDevKeyIfMemoryStore, type GatewayRuntime } from "./runtime.js";
@@ -12,7 +12,7 @@ import { registerAdminRoutes } from "./routes/adminKeys.js";
 
 declare module "fastify" {
   interface FastifyInstance {
-    telemetry: import("@axiom-ai/core").TelemetryHandle;
+    telemetry: TelemetryHandle;
     runtime: GatewayRuntime;
   }
 }

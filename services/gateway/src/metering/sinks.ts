@@ -20,6 +20,12 @@ export interface MeterRecord {
   costUsd: number;
   latencyMs: number;
   upstreamStatus: number;
+  /** Provider-native prompt-cache accounting (G6 input caching). */
+  cachedInputTokens: number;
+  cacheWriteTokens: number;
+  cacheReadTokens: number;
+  /** Gateway-level exact-match cache outcome for this delivery. */
+  cacheHit: boolean;
 }
 
 export interface MeterSink {
@@ -116,6 +122,10 @@ export class ClickHouseMeterSink extends BufferedSink {
           cost_usd: entry.costUsd,
           latency_ms: entry.latencyMs,
           upstream_status: entry.upstreamStatus,
+          cached_input_tokens: entry.cachedInputTokens,
+          cache_write_tokens: entry.cacheWriteTokens,
+          cache_read_tokens: entry.cacheReadTokens,
+          cache_hit: entry.cacheHit ? 1 : 0,
         }),
       )
       .join("\n");

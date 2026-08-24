@@ -2,6 +2,13 @@
  * Anthropic Messages API adapter (G1). Anthropic does not speak the
  * OpenAI wire format, so this adapter translates requests, responses, and
  * the event-based SSE stream. Enabled only when ANTHROPIC_API_KEY is set.
+ *
+ * Prompt caching (input caching): messages/system flagged with
+ * `cacheControl: "ephemeral"` in the unified shape become Anthropic
+ * `cache_control` content blocks; cache_creation/cache_read token counts
+ * from the response are surfaced for metering. When `autoSystemCache` is
+ * enabled the trailing system block is marked automatically so tenants get
+ * caching without changing payloads.
  */
 
 import type { ChatCompletionRequest } from "@axiom-ai/core";
@@ -12,6 +19,7 @@ import { classifyFailure } from "./classify.js";
 interface AnthropicContentBlock {
   type: string;
   text?: string;
+  cache_control?: { type: "ephemeral" };
 }
 
 interface AnthropicResponse {
@@ -20,7 +28,12 @@ interface AnthropicResponse {
   role: string;
   content: AnthropicContentBlock[];
   stop_reason: string | null;
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
 }
 
 const BASE_URL = "https://api.anthropic.com/v1";
@@ -35,6 +48,116 @@ function anthropicHeaders(apiKey: string | undefined): Record<string, string> {
   };
 }
 
+/** Unified message → Anthropic content blocks, honoring cache markers. */
+function toContentBlocks(
+  text: string,
+  cacheControl: "ephemeral" | undefined,
+): Array<AnthropicContentBlock> {
+  const block: AnthropicContentBlock = { type: "text", text };
+  if (cacheControl !== undefined) {
+    block.cache_control = { type: "ephemeral" };
+  }
+  return [block];
+}
+
+export function mapRequestToAnthropic(
+  body: ChatCompletionRequest,
+  autoSystemCache = false,
+): Record<string, unknown> {
+  const systemMessages = body.messages.filter((m) => m.role === "system");
+  const conversation = body.messages.filter((m) => m.role !== "system");
+
+  let system: Array<AnthropicContentBlock> | undefined;
+  if (systemMessages.length > 0) {
+    system = systemMessages.map((m, index): AnthropicContentBlock => {
+      const isLastSystem = index === systemMessages.length - 1;
+      const mark = m.cacheControl ?? (autoSystemCache && isLastSystem ? "ephemeral" : undefined);
+      return { type: "text", text: m.content, ...(mark !== undefined ? { cache_control: { type: "ephemeral" as const } } : {}) };
+    });
+  }
+
+  const messages = conversation.map((m) => ({
+    role: m.role,
+    content: toContentBlocks(m.content, m.cacheControl),
+  }));
+
+  const payload: Record<string, unknown> = {
+    model: body.model,
+    messages,
+    max_tokens: body.maxTokens ?? MAX_TOKENS_FALLBACK,
+    stream: false,
+  };
+  if (body.temperature !== undefined) payload.temperature = body.temperature;
+  if (body.topP !== undefined) payload.top_p = body.topP;
+  if (body.stopSequences?.length) payload.stop_sequences = body.stopSequences;
+  if (system !== undefined) payload.system = system;
+  return payload;
+}
+
+export interface WireUsageWithCache {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+/**
+ * Anthropic native response → OpenAI wire shape, so clients of the gateway
+ * see one consistent response schema regardless of serving provider.
+ * Cache token counts pass through for metering and client visibility.
+ */
+export function mapToOpenAiWire(body: AnthropicResponse): {
+  body: Record<string, unknown>;
+  usage: WireUsageWithCache;
+} {
+  const text = body.content
+    .filter((block) => block.type === "text")
+    .map((block) => block.text ?? "")
+    .join("");
+  const promptTokens = body.usage?.input_tokens ?? 0;
+  const completionTokens = body.usage?.output_tokens ?? 0;
+  const usage: WireUsageWithCache = {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: promptTokens + completionTokens,
+    ...(body.usage?.cache_creation_input_tokens !== undefined
+      ? { cache_creation_input_tokens: body.usage.cache_creation_input_tokens }
+      : {}),
+    ...(body.usage?.cache_read_input_tokens !== undefined
+      ? { cache_read_input_tokens: body.usage.cache_read_input_tokens }
+      : {}),
+  };
+  return {
+    body: {
+      id: body.id,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: body.model,
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: text },
+          finish_reason: mapStopReason(body.stop_reason),
+        },
+      ],
+      usage,
+    },
+    usage,
+  };
+}
+
+function mapStopReason(reason: string | null): string {
+  switch (reason) {
+    case "max_tokens":
+      return "length";
+    case "stop_sequence":
+      return "stop";
+    default:
+      return "stop";
+  }
+}
+
 export class AnthropicAdapter implements ProviderAdapter {
   readonly id: ProviderId = "anthropic";
   readonly baseUrl = BASE_URL;
@@ -43,6 +166,8 @@ export class AnthropicAdapter implements ProviderAdapter {
     private readonly apiKey: string | undefined,
     private readonly timeoutMs: number,
     private readonly fetchImpl: typeof fetch = fetch,
+    /** Mark the trailing system block with cache_control automatically. */
+    private readonly autoSystemCache = false,
   ) {}
 
   isConfigured(): boolean {
@@ -57,13 +182,13 @@ export class AnthropicAdapter implements ProviderAdapter {
         method: "POST",
         signal: anyOf(call.signal, controller.signal),
         headers: anthropicHeaders(this.apiKey),
-        body: JSON.stringify(mapRequestToAnthropic(call.body)),
+        body: JSON.stringify(mapRequestToAnthropic(call.body, this.autoSystemCache)),
       });
       if (!response.ok) {
         return classifyFailure(response.status, await safeText(response));
       }
       const body = (await response.json()) as AnthropicResponse;
-      return { ok: true, status: response.status, json: mapToOpenAiWire(body) };
+      return { ok: true, status: response.status, json: mapToOpenAiWire(body).body };
     } catch (error) {
       return failureFrom(error);
     } finally {
@@ -74,70 +199,12 @@ export class AnthropicAdapter implements ProviderAdapter {
   async stream(_call: UpstreamCall): Promise<UpstreamResult> {
     // Streaming translation for Anthropic's event protocol lands with the
     // streaming hardening pass; failover treats this as a skipped provider.
-    return { ok: false, reason: "upstream_error", message: "anthropic streaming not enabled", retryable: false };
-  }
-}
-
-function mapRequestToAnthropic(body: ChatCompletionRequest): Record<string, unknown> {
-  const system = body.messages
-    .filter((m) => m.role === "system")
-    .map((m) => m.content)
-    .join("\n\n");
-  const messages = body.messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({ role: m.role, content: m.content }));
-  const payload: Record<string, unknown> = {
-    model: body.model,
-    messages,
-    max_tokens: body.maxTokens ?? MAX_TOKENS_FALLBACK,
-    stream: false,
-  };
-  if (body.temperature !== undefined) payload.temperature = body.temperature;
-  if (body.topP !== undefined) payload.top_p = body.topP;
-  if (body.stopSequences?.length) payload.stop_sequences = body.stopSequences;
-  if (system.length > 0) payload.system = system;
-  return payload;
-}
-
-/**
- * Anthropic native response → OpenAI wire shape, so clients of the gateway
- * see one consistent response schema regardless of serving provider.
- */
-function mapToOpenAiWire(body: AnthropicResponse): Record<string, unknown> {
-  const text = body.content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text ?? "")
-    .join("");
-  const promptTokens = body.usage?.input_tokens ?? 0;
-  const completionTokens = body.usage?.output_tokens ?? 0;
-  return {
-    id: body.id,
-    object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
-    model: body.model,
-    choices: [
-      {
-        index: 0,
-        message: { role: "assistant", content: text },
-        finish_reason: mapStopReason(body.stop_reason),
-      },
-    ],
-    usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
-    },
-  };
-}
-
-function mapStopReason(reason: string | null): string {
-  switch (reason) {
-    case "max_tokens":
-      return "length";
-    case "stop_sequence":
-      return "stop";
-    default:
-      return "stop";
+    return {
+      ok: false,
+      reason: "upstream_error",
+      message: "anthropic streaming not enabled",
+      retryable: false,
+    };
   }
 }
 

@@ -16,6 +16,12 @@ export interface ChatMessage {
   /** Present when role === "tool": the tool invocation this message responds to. */
   toolCallId?: string;
   name?: string;
+  /**
+   * Prompt-cache marker (Anthropic semantics). The gateway translates this
+   * into `cache_control: {"type":"ephemeral"}` content blocks for Anthropic;
+   * OpenAI-family providers cache automatically and ignore it.
+   */
+  cacheControl?: "ephemeral";
 }
 
 export interface ChatToolDefinition {
@@ -36,12 +42,26 @@ export interface ChatCompletionRequest {
   stream?: boolean;
   /** Opaque caller identifier propagated into traces. */
   requestId?: string;
+  /**
+   * OpenAI prompt-cache routing hint (`prompt_cache_key`). Forwarded only
+   * to providers that support it (currently `openai`).
+   */
+  promptCacheKey?: string;
 }
 
 export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /**
+   * Prompt-cache accounting (provider-native caching):
+   * - cachedInputTokens: OpenAI `prompt_tokens_details.cached_tokens`
+   * - cacheWriteTokens: Anthropic `cache_creation_input_tokens`
+   * - cacheReadTokens: Anthropic `cache_read_input_tokens`
+   */
+  cachedInputTokens?: number;
+  cacheWriteTokens?: number;
+  cacheReadTokens?: number;
 }
 
 export interface ChatCompletionResponse {

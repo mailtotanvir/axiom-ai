@@ -122,6 +122,7 @@ services:
       REDIS_PRIMARY_URL: redis://redis:6379/0
       CLICKHOUSE_NODES: axiom:axiom@clickhouse:8123
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      GATEWAY_INPUT_CACHE: '{"enabled":true,"ttlSeconds":3600,"maxEntryBytes":1048576}'
     ports:
       - "3000:3000"
     depends_on:
