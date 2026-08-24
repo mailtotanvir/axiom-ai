@@ -317,6 +317,7 @@ Updated at the end of every completed phase.
 |-------|--------|-------------------|-------|
 | 0 — Foundation & Contracts | **Complete** (2026-08-24) | All — see below | C1, C2, X1–X4 delivered; commits `20d99b3..HEAD` |
 | 1 — Gateway MVP | **Complete** (2026-08-24) | All — see below | G1–G7 delivered; commits `a37fb9e`, `6615c55` |
+| 1.1 — Gateway input caching | **Complete** (2026-08-24) | n/a (addendum) | Exact-match tenant-scoped cache + provider-native prompt-cache metering for OpenAI/Anthropic families; commit `59e559b` |
 | 2 — RAG Pipeline | Not started | — | — |
 | 3 — Agent Runtime | Not started | — | — |
 | 4 — Ops & Observability | Not started | — | — |
