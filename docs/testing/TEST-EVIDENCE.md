@@ -96,9 +96,32 @@ gateway defects.
 
 ---
 
-## Phase 3 — Agent Runtime
+## Phase 3 — Agent Runtime (exit 2026-08-24)
 
-Evidence will be appended at phase exit.
+### Exit criteria
+
+| Criterion | Evidence |
+|-----------|----------|
+| Sandbox escape suite fully blocked with enforced CPU/memory caps | `sandbox.test.ts` red-team suite (10): infinite loop killed by CPU-time cap (host responsive, <5s wall); heap bomb trips the isolate memory limit; `require("fs")` denied (no `root` leak); network egress attempt fails; `process`/`global`/`require`/`fetch` all absent inside guests; prototype pollution cannot cross isolates; registry enforces manifest bounds and payload size caps fail-closed |
+| Killed worker resumes an in-flight run from last event | `orchestrator.test.ts > resumes an in-flight run from the last event after a simulated kill`: pre-seeded `run.started`, fresh orchestrator instance completes remaining steps only (2 planner calls), no duplicate `run.started` |
+| Webhook receiver proves exactly-once observation over at-least-once delivery | `webhooks.test.ts`: three dispatcher attempts against a recording receiver → exactly 1 stored observation (`duplicate:true` on replays); tampered payload → 401, never recorded |
+| DLQ replay restores delivery | Same file: exhausted attempts dead-letter to the Redis stream; `readDeadLetters` returns the payload; replay delivery succeeds once endpoint recovers |
+
+### Additional coverage
+
+- Context assembler: newest-first packing, truncation markers, bounded
+  worst cases vs. registered model windows (131072 / 1M).
+- Orchestrator: budget exhaustion fails structured; approval gates pause
+  and resume; terminal runs are idempotent; decision parser tolerates
+  fenced/embedded JSON.
+- **Live-stack verification** (containerized runtime + gateway + Groq):
+  submitted run completed with sandboxed calculator:
+  `{state:"completed", steps:2, tokensUsed:451, output:"…6 * 7 is 42."}`;
+  event log seq 1..5 persisted to Postgres
+  (`run.started → step.llm → step.tool → step.llm → run.completed`).
+
+Test totals at phase exit: **23 vitest passing** in agent-runtime (+3
+Redis-gated webhook integration tests via `TEST_WEBHOOKS_INTEGRATION=1`).
 
 ## Reproducing
 
