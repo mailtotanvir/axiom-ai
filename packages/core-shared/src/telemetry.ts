@@ -4,7 +4,7 @@
  * otherwise tracing stays inert so local dev and tests stay quiet.
  */
 
-import { type Span, SpanStatusCode, trace, type Tracer, context, type ContextAPI } from "@opentelemetry/api";
+import { type Span, SpanStatusCode, trace, type Tracer, context, type ContextAPI, propagation } from "@opentelemetry/api";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { Resource } from "@opentelemetry/resources";
 import {
@@ -105,5 +105,5 @@ export async function withSpan<T>(
 }
 
 /** Re-exported so services do not take direct OTel API dependencies. */
-export const otel = { trace, context };
+export const otel = { trace, context, propagation };
 export type { ContextAPI };
