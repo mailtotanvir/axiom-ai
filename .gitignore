@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Builds
+dist/
+build/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test & coverage
+coverage/
+.nyc_output/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.Zone.Identifier
+
+# Generated
+packages/*/src/generated/proto/
