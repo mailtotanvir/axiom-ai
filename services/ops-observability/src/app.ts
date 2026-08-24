@@ -1,8 +1,8 @@
-import Fastify, { FastifyError, FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 
 import { AxiomError, CORE_VERSION, errors, initTelemetry } from "@axiom-ai/core";
 
-import { OpsConfig } from "./config.js";
+import { type OpsConfig } from "./config.js";
 
 export function buildApp(config: OpsConfig): FastifyInstance {
   const telemetry = initTelemetry({

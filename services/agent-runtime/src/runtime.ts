@@ -2,9 +2,9 @@ import http from "node:http";
 
 import { CORE_VERSION, initTelemetry } from "@axiom-ai/core";
 
-import { AgentRuntimeConfig } from "./config.js";
+import { type AgentRuntimeConfig } from "./config.js";
 import { buildServer } from "./server.js";
-import { createQueues, RuntimeQueues } from "./queues.js";
+import { createQueues, type RuntimeQueues } from "./queues.js";
 
 export interface RunningRuntime {
   server: http.Server;

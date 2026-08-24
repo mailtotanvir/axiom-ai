@@ -4,7 +4,7 @@
  * otherwise tracing stays inert so local dev and tests stay quiet.
  */
 
-import { Span, SpanStatusCode, trace, Tracer, context, ContextAPI } from "@opentelemetry/api";
+import { type Span, SpanStatusCode, trace, type Tracer, context, type ContextAPI } from "@opentelemetry/api";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { Resource } from "@opentelemetry/resources";
 import {

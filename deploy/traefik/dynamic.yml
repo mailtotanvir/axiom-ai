@@ -1,0 +1,34 @@
+# Ingress routing per the architecture spec (section 3).
+# File-provider config: no Docker socket mount required.
+http:
+  routers:
+    gateway-route:
+      rule: "Host(`api.axiom.ai`) && PathPrefix(`/v1/models`)"
+      service: axiom-gateway-service
+    rag-route:
+      rule: "Host(`api.axiom.ai`) && PathPrefix(`/v1/knowledge`)"
+      service: axiom-rag-pipeline-service
+    agent-route:
+      rule: "Host(`api.axiom.ai`) && PathPrefix(`/v1/agents`)"
+      service: axiom-agent-runtime-service
+    ops-route:
+      rule: "Host(`ops.axiom.ai`)"
+      service: axiom-ops-observability-service
+
+  services:
+    axiom-gateway-service:
+      loadBalancer:
+        servers:
+          - url: "http://gateway:3000"
+    axiom-rag-pipeline-service:
+      loadBalancer:
+        servers:
+          - url: "http://rag-pipeline:8000"
+    axiom-agent-runtime-service:
+      loadBalancer:
+        servers:
+          - url: "http://agent-runtime:5000"
+    axiom-ops-observability-service:
+      loadBalancer:
+        servers:
+          - url: "http://ops-observability:4000"

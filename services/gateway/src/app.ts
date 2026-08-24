@@ -1,14 +1,11 @@
-import Fastify, { FastifyError, FastifyInstance, FastifyReply } from "fastify";
+import Fastify from "fastify";
+import type { FastifyError, FastifyInstance, FastifyReply } from "fastify";
 
 import { AxiomError, CORE_VERSION, errors, initTelemetry } from "@axiom-ai/core";
 
-import { GatewayConfig } from "./config.js";
+import { type GatewayConfig } from "./config.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerModelRoutes } from "./routes/models.js";
-
-export interface AppDeps {
-  /** Injection point for Phase 1 services (rate limiter, router, meter). */
-}
 
 export function buildApp(config: GatewayConfig): FastifyInstance {
   const telemetry = initTelemetry({

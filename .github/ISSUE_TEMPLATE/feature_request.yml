@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose an enhancement to Axiom AI
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What are you trying to achieve? Workarounds considered?
+    validations:
+      required: true
+  - type: dropdown
+    id: service
+    attributes:
+      label: Area
+      options:
+        - axiom-gateway
+        - axiom-rag-pipeline
+        - axiom-agent-runtime
+        - axiom-ops-observability
+        - axiom-core-shared
+        - docs / developer experience
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Willingness to contribute
+      options:
+        - label: I am willing to submit a PR for this (see CONTRIBUTING.md)

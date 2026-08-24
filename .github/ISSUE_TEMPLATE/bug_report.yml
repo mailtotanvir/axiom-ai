@@ -1,0 +1,36 @@
+name: Bug report
+description: Report something broken in Axiom AI
+labels: ["bug", "triage"]
+body:
+  - type: dropdown
+    id: service
+    attributes:
+      label: Service
+      options:
+        - axiom-gateway
+        - axiom-rag-pipeline
+        - axiom-agent-runtime
+        - axiom-ops-observability
+        - axiom-core-shared
+        - docs / developer experience
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, expected vs actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Axiom version/commit, OS, Docker version, deployment mode (compose/k8s)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact secrets and tenant data before pasting.

@@ -6,9 +6,19 @@
 
 import { z } from "zod";
 
-const url = z.string().url();
+/** Treats "" / whitespace-only env values as unset so blank .env entries are safe. */
+function blankToUndefined<S extends z.ZodTypeAny>(schema: S): z.ZodEffects<S> {
+  return z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    schema,
+  );
+}
+
+/** Optional string that also accepts "" (common in checked-in .env templates). */
+const optionalSecret = blankToUndefined(z.string().min(1).optional());
+
+const url = blankToUndefined(z.string().url());
 const optionalUrl = url.optional();
-const secret = z.string().min(1);
 
 export const AXIOM_ENVIRONMENTS = ["development", "test", "staging", "production"] as const;
 
@@ -28,14 +38,14 @@ export const baseConfigSchema = z.object({
 });
 
 export const providerKeysSchema = z.object({
-  OPENAI_API_KEY: secret.optional(),
-  ANTHROPIC_API_KEY: secret.optional(),
-  GEMINI_API_KEY: secret.optional(),
+  OPENAI_API_KEY: optionalSecret,
+  ANTHROPIC_API_KEY: optionalSecret,
+  GEMINI_API_KEY: optionalSecret,
   GEMINI_MODEL: z.string().default("gemini-3.6-flash"),
-  GROQ_API_KEY: secret.optional(),
-  MISTRAL_API_KEY: secret.optional(),
-  SILICONFLOW_API_KEY: secret.optional(),
-  NVIDIA_NIM_API_KEY: secret.optional(),
+  GROQ_API_KEY: optionalSecret,
+  MISTRAL_API_KEY: optionalSecret,
+  SILICONFLOW_API_KEY: optionalSecret,
+  NVIDIA_NIM_API_KEY: optionalSecret,
 });
 
 export const serviceEndpointsSchema = z.object({

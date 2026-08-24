@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      typescript-tooling:
+        patterns: ["typescript", "eslint*", "prettier", "@eslint/*", "typescript-eslint"]
+  - package-ecosystem: pip
+    directory: /services/rag-pipeline
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /services/rag-pipeline
+    schedule:
+      interval: monthly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
