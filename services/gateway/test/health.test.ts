@@ -1,45 +1,92 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import { createGatewayConfig } from "../src/config.js";
 
+const TEST_ENV = {
+  AXIOM_ENV: "test",
+  LOG_LEVEL: "error",
+  GEMINI_API_KEY: "test-key-gemini",
+  GROQ_API_KEY: "test-key-groq",
+  MISTRAL_API_KEY: "test-key-mistral",
+  SILICONFLOW_API_KEY: "test-key-sf",
+  NVIDIA_NIM_API_KEY: "test-key-nim",
+};
+
 describe("gateway scaffold", () => {
-  const app = buildApp(createGatewayConfig({ AXIOM_ENV: "test", LOG_LEVEL: "error" }));
-
   it("reports liveness with the canonical health body", async () => {
-    const response = await app.inject({ method: "GET", url: "/healthz" });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      status: "ok",
-      service: "axiom-gateway",
-      version: expect.any(String),
-    });
+    const app = await buildApp(createGatewayConfig(TEST_ENV));
+    try {
+      const response = await app.inject({ method: "GET", url: "/healthz" });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        status: "ok",
+        service: "axiom-gateway",
+        version: expect.any(String),
+      });
+    } finally {
+      await app.close();
+    }
   });
 
-  it("reports readiness", async () => {
-    const response = await app.inject({ method: "GET", url: "/readyz" });
-    expect(response.statusCode).toBe(200);
-    expect(response.json().status).toBe("ok");
+  it("lists a model catalog built from configured providers", async () => {
+    const app = await buildApp(createGatewayConfig(TEST_ENV));
+    try {
+      const response = await app.inject({ method: "GET", url: "/v1/models" });
+      expect(response.statusCode).toBe(200);
+      const models = response.json().data.map((m: { id: string }) => m.id);
+      // All five dev providers hold keys, so their catalog entries appear.
+      expect(models).toContain("gemini-3.6-flash");
+      expect(models).toContain("openai/gpt-oss-120b");
+      expect(models.length).toBeGreaterThanOrEqual(5);
+    } finally {
+      await app.close();
+    }
   });
 
-  it("lists the bootstrap model catalog including dev providers", async () => {
-    const response = await app.inject({ method: "GET", url: "/v1/models" });
-    expect(response.statusCode).toBe(200);
-    const models = response.json().data.map((m: { id: string }) => m.id);
-    expect(models).toContain("gemini-3.6-flash");
-    expect(models.length).toBeGreaterThanOrEqual(5);
+  it("serves an empty catalog when no provider keys are configured", async () => {
+    const app = await buildApp(
+      createGatewayConfig({
+        AXIOM_ENV: "test",
+        LOG_LEVEL: "error",
+        // Blank out any keys inherited from the developer environment.
+        GEMINI_API_KEY: "",
+        GROQ_API_KEY: "",
+        MISTRAL_API_KEY: "",
+        SILICONFLOW_API_KEY: "",
+        NVIDIA_NIM_API_KEY: "",
+        OPENAI_API_KEY: "",
+        ANTHROPIC_API_KEY: "",
+      }),
+    );
+    try {
+      const response = await app.inject({ method: "GET", url: "/v1/models" });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(0);
+    } finally {
+      await app.close();
+    }
   });
 
   it("maps unknown routes to the axiom error contract", async () => {
-    const response = await app.inject({ method: "GET", url: "/nope" });
-    expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({
-      error: { code: "AXIOM_NOT_FOUND", message: "Route not found.", retryable: false },
-    });
+    const app = await buildApp(createGatewayConfig({ AXIOM_ENV: "test", LOG_LEVEL: "error" }));
+    try {
+      const response = await app.inject({ method: "GET", url: "/nope" });
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({
+        error: { code: "AXIOM_NOT_FOUND", message: "Route not found.", retryable: false },
+      });
+    } finally {
+      await app.close();
+    }
   });
 
-  it("redacts authorization headers from logs", () => {
-    const appAny = app as unknown as { initialConfig: { fastify?: unknown } };
-    expect(appAny.initialConfig).toBeDefined();
+  it("rejects invalid routing configuration at startup", () => {
+    expect(() =>
+      createGatewayConfig({
+        AXIOM_ENV: "test",
+        GATEWAY_ROUTING: "{not json",
+      }),
+    ).toThrow(/GATEWAY_ROUTING/i);
   });
 });

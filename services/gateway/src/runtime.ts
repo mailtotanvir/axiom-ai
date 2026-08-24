@@ -70,7 +70,9 @@ export async function buildRuntime(config: GatewayConfig): Promise<GatewayRuntim
     adapters.set(anthropic.id, anthropic);
   }
 
-  const enabledProviders = new Set(adapters.keys());
+  const enabledProviders = new Set(
+    [...adapters.values()].filter((adapter) => adapter.isConfigured()).map((adapter) => adapter.id),
+  );
   const registry = ModelRegistry.forProviders(enabledProviders);
 
   const routing: RoutingConfig = config.GATEWAY_ROUTING;

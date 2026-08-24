@@ -46,10 +46,15 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.8-alpine
+    environment:
+      CLICKHOUSE_USER: axiom
+      CLICKHOUSE_PASSWORD: axiom
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     ports:
       - "8123:8123"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./deploy/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ulimits:
       nofile:
         soft: 262144
@@ -115,6 +120,7 @@ services:
       AXIOM_ENV: ${AXIOM_ENV:-development}
       GATEWAY_PORT: "3000"
       REDIS_PRIMARY_URL: redis://redis:6379/0
+      CLICKHOUSE_NODES: axiom:axiom@clickhouse:8123
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       - "3000:3000"

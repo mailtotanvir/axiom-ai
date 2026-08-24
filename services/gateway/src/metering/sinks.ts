@@ -100,7 +100,8 @@ export class ClickHouseMeterSink extends BufferedSink {
     const body = batch
       .map((entry) =>
         JSON.stringify({
-          timestamp: entry.timestamp,
+          // ClickHouse DateTime64 wants "YYYY-MM-DD HH:MM:SS.mmm".
+          timestamp: entry.timestamp.replace("T", " ").replace("Z", ""),
           request_id: entry.requestId,
           tenant_id: entry.tenantId,
           project_id: entry.projectId,
@@ -119,17 +120,30 @@ export class ClickHouseMeterSink extends BufferedSink {
       )
       .join("\n");
 
+    const query = "INSERT INTO axiom.metering_usage_events FORMAT JSONEachRow";
     let lastError: unknown;
     for (const node of this.nodes) {
       try {
-        const response = await this.fetchImpl(
-          `http://${node}/?query=${encodeURIComponent(
-            "INSERT INTO axiom.metering_usage_events FORMAT JSONEachRow",
-          )}`,
-          { method: "POST", body, headers: { "content-type": "text/plain" } },
-        );
+        // Node format allows credentials: user:password@host:8123
+        const url = new URL(`http://${node}`);
+        const headers: Record<string, string> = { "content-type": "text/plain" };
+        if (url.username !== "" || url.password !== "") {
+          headers.authorization = `Basic ${Buffer.from(
+            `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`,
+          ).toString("base64")}`;
+          // undici refuses fetch() on URLs carrying credentials.
+          url.username = "";
+          url.password = "";
+        }
+        // ClickHouse requires %20 (not '+') for spaces in query params.
+        url.search = `?query=${encodeURIComponent(query)}`;
+        const response = await this.fetchImpl(url.toString(), {
+          method: "POST",
+          body,
+          headers,
+        });
         if (!response.ok) {
-          throw new Error(`clickhouse ${node} responded ${response.status}`);
+          throw new Error(`clickhouse ${url.host} responded ${response.status}`);
         }
         return;
       } catch (error) {

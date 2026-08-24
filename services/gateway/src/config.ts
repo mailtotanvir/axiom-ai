@@ -41,7 +41,17 @@ export const gatewayConfigSchema = baseConfigSchema
         if (raw === undefined || raw.trim() === "") {
           return undefined;
         }
-        const parsed = routingConfigSchema.safeParse(JSON.parse(raw));
+        let jsonValue: unknown;
+        try {
+          jsonValue = JSON.parse(raw);
+        } catch (error) {
+          ctx.addIssue({
+            code: "custom",
+            message: `must be valid JSON (${error instanceof Error ? error.message : "parse error"})`,
+          });
+          return z.NEVER;
+        }
+        const parsed = routingConfigSchema.safeParse(jsonValue);
         if (!parsed.success) {
           for (const issue of parsed.error.issues) {
             ctx.addIssue({ code: "custom", message: `GATEWAY_ROUTING: ${issue.message}` });

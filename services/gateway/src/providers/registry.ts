@@ -6,8 +6,6 @@
 
 import type { ModelInfo, ProviderId } from "@axiom-ai/core";
 
-export interface CatalogEntry extends ModelInfo {}
-
 function entry(
   id: string,
   provider: ProviderId,
@@ -15,7 +13,7 @@ function entry(
   maxOutputTokens: number,
   inputCostPerMillion: number,
   outputCostPerMillion: number,
-): CatalogEntry {
+): ModelInfo {
   return {
     id,
     provider,
@@ -29,18 +27,18 @@ function entry(
   };
 }
 
-export const BOOTSTRAP_CATALOG: readonly CatalogEntry[] = [
+export const BOOTSTRAP_CATALOG: readonly ModelInfo[] = [
   entry("gemini-3.6-flash", "gemini", 1_000_000, 8192, 0.1, 0.4),
-  entry("llama-3.3-70b-versatile", "groq", 131_072, 32_768, 0.59, 0.79),
+  entry("openai/gpt-oss-120b", "groq", 131_072, 32_768, 0.59, 0.79),
   entry("mistral-large-latest", "mistral", 131_072, 32_768, 2.0, 6.0),
   entry("deepseek-ai/DeepSeek-V3", "siliconflow", 65_536, 16_384, 0.27, 1.1),
   entry("meta/llama-3.1-70b-instruct", "nvidia-nim", 131_072, 32_768, 0.6, 0.6),
 ];
 
 export class ModelRegistry {
-  private readonly byId = new Map<string, CatalogEntry>();
+  private readonly byId = new Map<string, ModelInfo>();
 
-  constructor(entries: readonly CatalogEntry[]) {
+  constructor(entries: readonly ModelInfo[]) {
     for (const item of entries) {
       this.byId.set(item.id, item);
     }
@@ -54,11 +52,11 @@ export class ModelRegistry {
     return this.byId.has(modelId);
   }
 
-  get(modelId: string): CatalogEntry | undefined {
+  get(modelId: string): ModelInfo | undefined {
     return this.byId.get(modelId);
   }
 
-  list(): CatalogEntry[] {
+  list(): ModelInfo[] {
     return [...this.byId.values()];
   }
 }

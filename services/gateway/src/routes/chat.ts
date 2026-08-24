@@ -9,7 +9,7 @@
  * `pipeline()` keeps end-to-end backpressure intact.
  */
 
-import { Readable, Transform, pipeline } from "node:stream";
+import { Readable } from "node:stream";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -119,6 +119,7 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
     let lastFailure:
       | { reason: string; status?: number; message?: string; provider: string }
       | undefined;
+    const attempts: Array<{ provider: string; status?: number; reason?: string; message?: string }> = [];
 
     for (const adapter of candidates) {
       if (!runtime.breaker.canAttempt(adapter.id)) {
@@ -139,6 +140,12 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
           message: result.message,
           provider: adapter.id,
         };
+        attempts.push({
+          provider: adapter.id,
+          status: result.status,
+          reason: result.reason,
+          message: result.message?.slice(0, 300),
+        });
         continue;
       }
       runtime.breaker.recordSuccess(adapter.id);
@@ -162,7 +169,7 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
             });
           },
         });
-        return reply;
+        return;
       }
 
       // Non-streaming: forward native wire body verbatim.
@@ -181,9 +188,17 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
     }
 
     if (lastFailure?.status === 429) {
-      throw errors.upstreamUnavailable(lastFailure.provider);
+      throw new AxiomError(
+        "AXIOM_UPSTREAM_UNAVAILABLE",
+        `Upstream provider '${lastFailure.provider}' rate limited the request.`,
+        { retryable: true, details: { attempts } },
+      );
     }
-    throw errors.allUpstreamsFailed(candidates.map((candidate) => candidate.id));
+    throw errors.allUpstreamsFailed(
+      attempts.length > 0
+        ? attempts
+        : candidates.map((candidate) => ({ provider: candidate.id, reason: "breaker_open" })),
+    );
   });
 }
 
@@ -274,6 +289,8 @@ async function pipeStreamingResponse(
     onFinish: (state: TapState) => Promise<void>;
   },
 ): Promise<void> {
+  // We drive the raw socket ourselves from here on.
+  reply.hijack();
   reply.raw.writeHead(200, {
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-cache",
@@ -303,24 +320,29 @@ async function pipeStreamingResponse(
     }
   });
 
-  const tapping = new Transform({
-    transform(chunk: Buffer, _encoding, callback) {
-      try {
-        callback(null, tap.push(new Uint8Array(chunk)));
-      } catch (error) {
-        callback(error instanceof Error ? error : new Error(String(error)));
+  let upstreamError: unknown;
+  try {
+    // Forward byte-for-byte; awaiting 'drain' preserves end-to-end
+    // backpressure (client socket gates upstream consumption).
+    for await (const chunk of Readable.fromWeb(upstream)) {
+      const forwarded = tap.push(chunk as Uint8Array);
+      if (!reply.raw.write(forwarded)) {
+        await new Promise<void>((resolve) => reply.raw.once("drain", resolve));
       }
-    },
-    flush(callback) {
-      tap.finish();
-      callback();
-    },
-  });
+    }
+    tap.finish();
+  } catch (error) {
+    upstreamError = error;
+  }
 
   try {
-    await pipeline(Readable.fromWeb(upstream), tapping, reply.raw);
     await hooks.onFinish(state);
   } catch {
-    // Client disconnect or upstream reset: socket cleanup already handled.
+    /* metering must never break the response path */
   }
+
+  if (!reply.raw.writableEnded) {
+    reply.raw.end();
+  }
+  void upstreamError; // truncated streams are surfaced via metering/traces
 }

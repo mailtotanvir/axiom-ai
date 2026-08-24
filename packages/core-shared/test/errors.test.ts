@@ -24,8 +24,18 @@ describe("AxiomError", () => {
   });
 
   it("includes details when provided", () => {
-    const body = errors.allUpstreamsFailed(["gemini", "groq"]).toJSON();
-    expect(body.error.details).toEqual({ providers: ["gemini", "groq"] });
+    const body = errors
+      .allUpstreamsFailed([
+        { provider: "gemini", status: 429, reason: "rate_limited" },
+        { provider: "groq", status: 500, reason: "upstream_error" },
+      ])
+      .toJSON();
+    expect(body.error.details).toEqual({
+      attempts: [
+        { provider: "gemini", status: 429, reason: "rate_limited" },
+        { provider: "groq", status: 500, reason: "upstream_error" },
+      ],
+    });
     expect(body.error.retryable).toBe(true);
   });
 

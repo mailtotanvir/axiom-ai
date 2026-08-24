@@ -17,14 +17,17 @@ declare module "fastify" {
   }
 }
 
-export async function buildApp(config: GatewayConfig): Promise<FastifyInstance> {
+export async function buildApp(
+  config: GatewayConfig,
+  runtimeOverride?: GatewayRuntime,
+): Promise<FastifyInstance> {
   const telemetry = initTelemetry({
     serviceName: "axiom-gateway",
     serviceVersion: CORE_VERSION,
     otlpEndpoint: config.OTEL_EXPORTER_OTLP_ENDPOINT,
   });
 
-  const runtime = await buildRuntime(config);
+  const runtime = runtimeOverride ?? (await buildRuntime(config));
 
   const app = Fastify({
     logger: {

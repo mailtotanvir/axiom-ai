@@ -45,6 +45,13 @@ export interface AxiomErrorBody {
   };
 }
 
+export interface UpstreamFailureDetail {
+  provider: string;
+  status?: number;
+  reason?: string;
+  message?: string;
+}
+
 export class AxiomError extends Error {
   readonly code: AxiomErrorCode;
   readonly statusCode: number;
@@ -134,10 +141,10 @@ export const errors = {
       details: { provider },
     }),
 
-  allUpstreamsFailed: (providers: readonly string[]) =>
+  allUpstreamsFailed: (attempts: readonly (string | UpstreamFailureDetail)[]) =>
     new AxiomError("AXIOM_ALL_UPSTREAMS_FAILED", "All routed providers failed.", {
       retryable: true,
-      details: { providers },
+      details: { attempts },
     }),
 
   sandboxViolation: (reason: string) =>

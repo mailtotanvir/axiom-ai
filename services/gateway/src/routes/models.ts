@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
-import { ModelRegistry } from "../providers/registry.js";
+import { type ModelRegistry } from "../providers/registry.js";
 
 interface OwnedModel {
   id: string;
