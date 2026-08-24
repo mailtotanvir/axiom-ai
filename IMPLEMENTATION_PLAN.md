@@ -318,10 +318,25 @@ Updated at the end of every completed phase.
 | 0 — Foundation & Contracts | **Complete** (2026-08-24) | All — see below | C1, C2, X1–X4 delivered; commits `20d99b3..HEAD` |
 | 1 — Gateway MVP | **Complete** (2026-08-24) | All — see below | G1–G7 delivered; commits `a37fb9e`, `6615c55` |
 | 1.1 — Gateway input caching | **Complete** (2026-08-24) | n/a (addendum) | Exact-match tenant-scoped cache + provider-native prompt-cache metering for OpenAI/Anthropic families; commit `59e559b` |
-| 2 — RAG Pipeline | Not started | — | — |
-| 3 — Agent Runtime | Not started | — | — |
+| 2 — RAG Pipeline | **Deferred by owner decision** (moved after Phase 3) | — | Scaffold + API contracts stand from Phase 0; epics R1–R6 pending |
+| 3 — Agent Runtime | **Complete** (2026-08-24) | All — see below | A1–A5 delivered (Temporal deferred per D2); commits `2aa9473`, `bc8e9b2`, `367f0a1`, `4497fce` |
 | 4 — Ops & Observability | Not started | — | — |
 | 5 — Hardening & Launch | Not started | — | — |
+
+### Phase 3 exit-criteria review (2026-08-24)
+
+| Criterion | Result |
+|-----------|--------|
+| Sandbox escape suite fully blocked with enforced caps | Done — isolated-vm red-team suite green: CPU-time cap kills loops, heap cap kills bombs, module/network/host-handle escapes fail closed, pollution contained |
+| Killed worker resumes in-flight run from last event | Done — event-sourced replay test proves continuation without duplicate start or repeated planner work |
+| Webhook exactly-once observation over at-least-once delivery | Done — integration test: 3 attempts observed once via event-id dedupe; tampered deliveries rejected pre-recording |
+| DLQ replay restores delivery | Done — dead-letter stream round-trip proven end to end |
+
+**Live proof:** first real agent run completed on the compose stack
+(planner via gateway on Groq gpt-oss-120b, calculator executed inside
+isolated-vm): completed / 2 steps / 451 tokens / correct answer, with the
+full event log persisted to Postgres. Evidence:
+[docs/testing/TEST-EVIDENCE.md](docs/testing/TEST-EVIDENCE.md).
 
 ### Phase 1 exit-criteria review (2026-08-24)
 
