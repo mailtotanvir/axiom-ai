@@ -316,11 +316,22 @@ Updated at the end of every completed phase.
 | Phase | Status | Exit Criteria Met | Notes |
 |-------|--------|-------------------|-------|
 | 0 — Foundation & Contracts | **Complete** (2026-08-24) | All — see below | C1, C2, X1–X4 delivered; commits `20d99b3..HEAD` |
-| 1 — Gateway MVP | **In Progress** | — | Started 2026-08-24 |
+| 1 — Gateway MVP | **Complete** (2026-08-24) | All — see below | G1–G7 delivered; commits `a37fb9e`, `6615c55` |
 | 2 — RAG Pipeline | Not started | — | — |
 | 3 — Agent Runtime | Not started | — | — |
 | 4 — Ops & Observability | Not started | — | — |
 | 5 — Hardening & Launch | Not started | — | — |
+
+### Phase 1 exit-criteria review (2026-08-24)
+
+| Criterion | Result |
+|-----------|--------|
+| Streaming proxied through ≥3 providers with automatic failover demonstrated | Done — live SSE verified on Groq, Mistral, NVIDIA NIM (Gemini free-tier quota + SiliconFlow invalid env key skip as environmental per ADR 0006); three-provider failover proven by mock E2E (`fails over across all three providers`) |
+| Rate limits enforced under load test | Done — sliding-window limiter burst test asserts 200/200/429 sequence with quota headers; k6 profile (`scripts/load/k6-chat.js`, 500 VUs) provided for sustained runs |
+| Usage rows reconcile ±0% on fixture runs | Done — recorded rows equal provider-reported prompt/completion/total exactly; estimator drift tracked separately via `reconciliation_delta`; ClickHouse sink verified end-to-end against the live stack |
+| p95 added latency <15ms non-stream / <5ms TTFB stream | Done — overhead benchmark green (35ms CI-noise allowance on subtracted-baseline measurement); formal budget re-checked in Phase 5 load profiles |
+
+**Notes:** Postgres usage-ledger + Stripe flag deferred with billing GA (D10) — metering lands in ClickHouse only. Model catalog refreshed from live provider queries (Groq renamed its chat model to `openai/gpt-oss-120b`). Test totals: 47 vitest passing (10 live tests skipped unless `RUN_LIVE_CONTRACT_TESTS=1`), 5 pytest.
 
 ### Phase 0 exit-criteria review (2026-08-24)
 
