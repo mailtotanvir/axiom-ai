@@ -1,7 +1,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { buildServer } from "../src/server.js";
+import { buildServer, registerNotFoundHandler } from "../src/server.js";
 
 describe("agent-runtime scaffold", () => {
   const app = buildServer();
@@ -25,6 +25,7 @@ describe("agent-runtime scaffold", () => {
   });
 
   it("maps unknown routes to the axiom error contract", async () => {
+    registerNotFoundHandler(app);
     const response = await request(app).get("/nope");
     expect(response.statusCode).toBe(404);
     expect(response.body.error.code).toBe("AXIOM_NOT_FOUND");
