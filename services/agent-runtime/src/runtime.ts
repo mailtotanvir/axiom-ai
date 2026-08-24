@@ -18,7 +18,7 @@ import { ToolRegistry } from "./sandbox/registry.js";
 import { IsolatedVmExecutor } from "./sandbox/isolatedVmExecutor.js";
 import { WebhookDispatcher } from "./webhooks/dispatcher.js";
 import { createQueues, QUEUE_NAMES, type RuntimeQueues } from "./queues.js";
-import { buildServer } from "./server.js";
+import { buildServer, registerNotFoundHandler } from "./server.js";
 import type { AgentRuntimeConfig } from "./config.js";
 
 export interface RunningRuntime {
@@ -143,11 +143,19 @@ export async function startRuntime(config: AgentRuntimeConfig): Promise<RunningR
     }
     const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const { tenantId, projectId, idempotencyKey, input, definition, approval } = parsed.data;
-    await queues.agentExec.add(
-      "agent-run",
-      { runId, tenantId, projectId, idempotencyKey, input, definition, ...(approval ? { approval } : {}) },
-      { jobId: `${idempotencyKey}:${runId}`, priority: priorityFor((parsedJson as { tier?: string }).tier) },
-    );
+    try {
+      // Idempotent dedupe happens in the event store; jobId stays colon-free
+      // (a BullMQ custom-id constraint).
+      await queues.agentExec.add(
+        "agent-run",
+        { runId, tenantId, projectId, idempotencyKey, input, definition, ...(approval ? { approval } : {}) },
+        { jobId: runId, priority: priorityFor((parsedJson as { tier?: string }).tier) },
+      );
+    } catch (error) {
+      console.error("[agent-runtime] enqueue failed", error instanceof Error ? error.message : error);
+      res.status(500).json(errors.internal().toJSON());
+      return;
+    }
     res.status(202).json({ runId, state: "queued" });
   });
 
@@ -168,6 +176,8 @@ export async function startRuntime(config: AgentRuntimeConfig): Promise<RunningR
     }
     res.status(200).json({ events });
   });
+
+  registerNotFoundHandler(app);
 
   const server = http.createServer(app);
   await new Promise<void>((resolve, reject) => {
@@ -201,6 +211,12 @@ export async function startRuntime(config: AgentRuntimeConfig): Promise<RunningR
     },
     { connection: connectionOf(config), concurrency: 4 },
   );
+  agentWorker.on("failed", (_job, err) => {
+    console.error(`[agent-exec] job failed: ${err.message}`);
+  });
+  agentWorker.on("error", (err) => {
+    console.error(`[agent-exec] worker error: ${err.message}`);
+  });
 
   const webhookWorker = new Worker(
     QUEUE_NAMES.webhookDelivery,

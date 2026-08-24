@@ -78,9 +78,12 @@ export function buildServer(options: ServerOptions = {}): Express {
     res.status(200).json({ deliveries: recordedDeliveries() });
   });
 
+  return app;
+}
+
+/** Call AFTER all service-specific routes are registered. */
+export function registerNotFoundHandler(app: Express): void {
   app.use((_req: Request, res: Response) => {
     res.status(404).json(errors.notFound("Route").toJSON());
   });
-
-  return app;
 }

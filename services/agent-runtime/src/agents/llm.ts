@@ -42,7 +42,7 @@ export class GatewayLlmClient implements LlmClient {
         // Planning decisions are parsed programmatically; keep them tight.
         temperature: 0,
       }),
-      signal: request.signal,
+      signal: request.signal ?? AbortSignal.timeout(90_000),
     });
     if (!response.ok) {
       throw new Error(`gateway planning call failed: HTTP ${response.status}`);

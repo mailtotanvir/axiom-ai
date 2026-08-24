@@ -142,6 +142,7 @@ services:
         condition: service_healthy
 
   agent-runtime:
+    <<: *ts-service
     build:
       context: .
       dockerfile: deploy/docker/service.Dockerfile
@@ -153,6 +154,8 @@ services:
       AXIOM_ENV: ${AXIOM_ENV:-development}
       AGENT_RUNTIME_PORT: "5000"
       REDIS_PRIMARY_URL: redis://redis:6379/2
+      AGENT_RUNTIME_PG_URI: postgresql://axiom:axiom@postgres:5432/axiom_metadata
+      GATEWAY_INTERNAL_URL: http://gateway:3000
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       - "5000:5000"
@@ -161,6 +164,7 @@ services:
         condition: service_healthy
 
   ops-observability:
+    <<: *ts-service
     build:
       context: .
       dockerfile: deploy/docker/service.Dockerfile
