@@ -315,9 +315,20 @@ Updated at the end of every completed phase.
 
 | Phase | Status | Exit Criteria Met | Notes |
 |-------|--------|-------------------|-------|
-| 0 — Foundation & Contracts | **In Progress** | — | Started 2026-08-24 |
-| 1 — Gateway MVP | Not started | — | — |
+| 0 — Foundation & Contracts | **Complete** (2026-08-24) | All — see below | C1, C2, X1–X4 delivered; commits `20d99b3..HEAD` |
+| 1 — Gateway MVP | **In Progress** | — | Started 2026-08-24 |
 | 2 — RAG Pipeline | Not started | — | — |
 | 3 — Agent Runtime | Not started | — | — |
 | 4 — Ops & Observability | Not started | — | — |
 | 5 — Hardening & Launch | Not started | — | — |
+
+### Phase 0 exit-criteria review (2026-08-24)
+
+| Criterion | Result |
+|-----------|--------|
+| All repos scaffolded with governance kit, strict tooling, `.env.example`, Dockerfiles | Done — 4 services + core package, Apache-2.0 kit, ADRs 0001–0007 |
+| CI running per repo (lint → typecheck → test → build → image) | Done — matrix CI + buf lint + docker builds + release workflow w/ SBOM |
+| `@axiom-ai/core` v0 published with protos consumed by each service | Done locally as `@axiom-ai/core@0.1.0` via workspace link; npm publish deferred until org exists (D9/D12) — all 4 services consume types/config/errors/crypto/telemetry |
+| Local compose stack boots; `make up && make smoke` passes on a clean machine | Done — verified live: 8/8 checks (all healths, model catalog, retrieve stub, ClickHouse ping, Qdrant readiness); Traefik host routing matches spec §3 |
+
+**Deviations from plan:** ops service published on host port 14000 (container keeps spec port 4000) due to an unrelated local process holding 4000. Temporal spike already removed (D2). Test totals: 28 vitest + 5 pytest, ruff/mypy/eslint/tsc clean.
