@@ -22,6 +22,7 @@ import { InMemoryRateLimiter } from "../src/ratelimit/rateLimiter.js";
 import { InMemoryApiKeyStore } from "../src/auth/apiKeyStore.js";
 import { PassThroughGuardrails } from "../src/guardrails/guardrails.js";
 import { CapturingSink } from "./helpers/capturingSink.js";
+import { InMemoryCacheStore, InputCache } from "../src/cache/inputCache.js";
 
 const RUN_LIVE = process.env.RUN_LIVE_CONTRACT_TESTS === "1";
 const TIMEOUT_MS = 60_000;
@@ -90,6 +91,12 @@ describe.runIf(RUN_LIVE)("live provider contracts", () => {
           keyStore,
           sinks: [sink],
           guardrails: new PassThroughGuardrails(),
+          inputCache: new InputCache(new InMemoryCacheStore(), {
+            enabled: false,
+            ttlSeconds: 60,
+            maxEntryBytes: 1024 * 1024,
+          }),
+          anthropicAutoSystemCache: false,
           close: async () => undefined,
         };
 
@@ -173,6 +180,12 @@ describe.runIf(RUN_LIVE)("live provider contracts", () => {
           keyStore,
           sinks: [new CapturingSink()],
           guardrails: new PassThroughGuardrails(),
+          inputCache: new InputCache(new InMemoryCacheStore(), {
+            enabled: false,
+            ttlSeconds: 60,
+            maxEntryBytes: 1024 * 1024,
+          }),
+          anthropicAutoSystemCache: false,
           close: async () => undefined,
         };
         const app = await buildApp(
