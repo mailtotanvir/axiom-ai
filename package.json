@@ -21,5 +21,10 @@
   },
   "dependencies": {
     "js-tiktoken": "^1.0.21"
+  },
+  "allowScripts": {
+    "prisma@6.19.3": true,
+    "@prisma/client@7.10.0": true,
+    "@prisma/engines@6.19.3": true
   }
 }

@@ -1,10 +1,13 @@
 import { CORE_VERSION } from "@axiom-ai/core";
 
-import { buildApp } from "./app.js";
+import { buildApp, migrateRegistry } from "./app.js";
 import { createOpsConfig } from "./config.js";
 
 async function main(): Promise<void> {
   const config = createOpsConfig();
+  if (config.POSTGRES_DB_URI !== undefined) {
+    await migrateRegistry(config.POSTGRES_DB_URI);
+  }
   const app = buildApp(config);
 
   const shutdown = async (signal: string): Promise<void> => {

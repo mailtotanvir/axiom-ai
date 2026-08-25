@@ -1,6 +1,5 @@
-// Axiom AI control-plane metadata schema (Phase 4 epic O2/O3).
-// Prompts are versioned, immutable artifacts; evals link datasets to
-// prompt versions and store scored runs in ClickHouse (via O1).
+// Prompt registry (O2): prompts as typed, versioned artifacts with
+// environment promotion and immutable published versions.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,63 +10,50 @@ datasource db {
   url      = env("POSTGRES_DB_URI")
 }
 
-enum PromptEnvironment {
-  development
-  staging
-  production
-}
-
 model Prompt {
-  id        String   @id @default(cuid())
-  name      String
-  tenantId  String
-  createdAt DateTime @default(now())
-
-  versions PromptVersion[]
+  id          String          @id @default(uuid())
+  tenantId    String          @map("tenant_id")
+  name        String
+  description String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  versions    PromptVersion[]
 
   @@unique([tenantId, name])
+  @@map("prompts")
 }
 
 model PromptVersion {
-  id            String   @id @default(cuid())
-  promptId      String
-  semver        String
-  template      String
-  variablesJson Json? // JSON Schema for template variables
-  environment   PromptEnvironment @default(development)
-  createdBy     String
-  createdAt     DateTime @default(now())
+  id             String    @id @default(uuid())
+  promptId       String    @map("prompt_id")
+  prompt         Prompt    @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  semver         String
+  template       String
+  /// JSON Schema (draft-07) describing allowed template variables.
+  templateSchema Json?     @map("template_schema")
+  model          String?
+  temperature    Float?
+  /// draft | published | archived
+  status         String    @default("draft")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  publishedAt    DateTime? @map("published_at")
 
-  prompt    Prompt       @relation(fields: [promptId], references: [id])
-  evalRuns  EvalRun[]
+  promotions PromptPromotion[]
 
   @@unique([promptId, semver])
+  @@index([promptId, status])
+  @@map("prompt_versions")
 }
 
-model EvalDataset {
-  id        String   @id @default(cuid())
-  name      String
-  tenantId  String
-  version   String
-  casesJson Json // array of { input, expectedOutput?, context? }
-  createdAt DateTime @default(now())
+model PromptPromotion {
+  id          String        @id @default(uuid())
+  versionId   String        @map("version_id")
+  version     PromptVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  /// development | staging | production
+  environment String
+  promotedAt  DateTime      @default(now()) @map("promoted_at")
+  promotedBy  String?       @map("promoted_by")
 
-  evalRuns EvalRun[]
-
-  @@unique([tenantId, name, version])
-}
-
-model EvalRun {
-  id             String   @id @default(cuid())
-  promptVersionId String
-  datasetId      String
-  model          String
-  status         String   // queued | running | completed | failed
-  metricsJson    Json?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime @default(now())
-
-  promptVersion PromptVersion @relation(fields: [promptVersionId], references: [id])
-  dataset       EvalDataset   @relation(fields: [datasetId], references: [id])
+  @@unique([versionId, environment])
+  @@map("prompt_promotions")
 }

@@ -7,19 +7,39 @@
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 
 import { AxiomError, CORE_VERSION, errors, initTelemetry } from "@axiom-ai/core";
-import { type Pool } from "pg";
+import { PrismaClient } from "@prisma/client";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { type OpsConfig } from "./config.js";
 import { ClickHouseHttp, type ClickHouseClient } from "./clickhouse.js";
-import { PostgresRetentionStore, type RetentionStore } from "./retention.js";
+import { InMemoryRetentionStore, PostgresRetentionStore, type RetentionStore } from "./retention.js";
 import { ClickHouseTraceStore, type TraceStore } from "./traces/store.js";
 import { registerTraceRoutes } from "./traces/routes.js";
+import { registerPromptRoutes } from "./prompts/routes.js";
+import { PrismaPromptRegistry } from "./prompts/store.js";
+import { InMemoryPromptRegistry } from "./prompts/memoryStore.js";
+import type { PromptRegistryStore } from "./prompts/types.js";
 
 export interface OpsStores {
   clickhouse?: ClickHouseClient;
   traceStore?: TraceStore;
   retention?: RetentionStore;
-  postgresPool?: Pool;
+  registry?: PromptRegistryStore;
+}
+
+/** Applies the prompt-registry DDL idempotently (see prisma/ddl.sql). */
+export async function migrateRegistry(dataSourceUrl: string): Promise<void> {
+  const ddlPath = fileURLToPath(new URL("../prisma/ddl.sql", import.meta.url));
+  const ddl = readFileSync(ddlPath, "utf8");
+  const client = new PrismaClient({ datasources: { db: { url: dataSourceUrl } } });
+  try {
+    for (const statement of ddl.split(";").map((s) => s.trim()).filter(Boolean)) {
+      await client.$executeRawUnsafe(statement);
+    }
+  } finally {
+    await client.$disconnect();
+  }
 }
 
 export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInstance {
@@ -38,12 +58,17 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
       ? new ClickHouseHttp(config.CLICKHOUSE_NODES)
       : undefined);
 
-  const postgresPool = stores.postgresPool ?? null;
   const retention =
     stores.retention ??
     (config.POSTGRES_DB_URI !== undefined
       ? new PostgresRetentionStore(config.POSTGRES_DB_URI)
       : undefined);
+
+  const registry =
+    stores.registry ??
+    (config.POSTGRES_DB_URI !== undefined
+      ? new PrismaPromptRegistry(config.POSTGRES_DB_URI)
+      : new InMemoryPromptRegistry());
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof AxiomError) {
@@ -69,7 +94,7 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
   }));
 
   app.get("/readyz", async (_request, reply) => {
-    // O1: verify ClickHouse (+ Postgres when configured) reachability.
+    // O1/O2: verify ClickHouse + Postgres reachability where configured.
     const checks: Record<string, boolean | "skipped"> = {};
     let ready = true;
     if (clickhouse === undefined) {
@@ -78,8 +103,10 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
       checks.clickhouse = await clickhouse.ping();
       ready = ready && checks.clickhouse !== false;
     }
-    if (retention instanceof PostgresRetentionStore) {
-      const pgReady = postgresPool !== null ? await pingPostgres(postgresPool) : true;
+    if (config.POSTGRES_DB_URI === undefined) {
+      checks.postgres = "skipped";
+    } else {
+      const pgReady = await pingPostgres(config.POSTGRES_DB_URI);
       checks.postgres = pgReady;
       ready = ready && pgReady;
     }
@@ -99,14 +126,20 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
     };
   });
 
-  if (clickhouse !== undefined && retention !== undefined) {
-    const traceStore = stores.traceStore ?? new ClickHouseTraceStore(clickhouse);
-    registerTraceRoutes(app, {
-      store: traceStore,
-      retention,
-      internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
-    });
-  }
+  registerTraceRoutes(app, {
+    store:
+      stores.traceStore ??
+      new ClickHouseTraceStore(
+        clickhouse ?? new ClickHouseHttp(["invalid:8123"]),
+      ),
+    retention: retention ?? new InMemoryRetentionStore(),
+    internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
+  });
+
+  registerPromptRoutes(app, {
+    registry,
+    internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
+  });
 
   app.decorate("closeStores", async () => {
     await retention?.close();
@@ -115,10 +148,15 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
   return app;
 }
 
-async function pingPostgres(pool: Pool): Promise<boolean> {
+async function pingPostgres(connectionString: string): Promise<boolean> {
   try {
-    await pool.query("SELECT 1");
-    return true;
+    const client = new PrismaClient({ datasources: { db: { url: connectionString } } });
+    try {
+      await client.$queryRaw`SELECT 1`;
+      return true;
+    } finally {
+      await client.$disconnect();
+    }
   } catch {
     return false;
   }
