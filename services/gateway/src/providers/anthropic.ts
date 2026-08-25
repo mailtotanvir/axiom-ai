@@ -181,7 +181,10 @@ export class AnthropicAdapter implements ProviderAdapter {
       const response = await this.fetchImpl(`${BASE_URL}/messages`, {
         method: "POST",
         signal: anyOf(call.signal, controller.signal),
-        headers: anthropicHeaders(this.apiKey),
+        headers: {
+          ...anthropicHeaders(this.apiKey),
+          ...call.headers,
+        },
         body: JSON.stringify(mapRequestToAnthropic(call.body, this.autoSystemCache)),
       });
       if (!response.ok) {
