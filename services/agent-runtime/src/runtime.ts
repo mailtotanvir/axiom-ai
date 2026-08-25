@@ -108,6 +108,8 @@ export async function startRuntime(config: AgentRuntimeConfig): Promise<RunningR
   const llm: LlmClient = new GatewayLlmClient(
     config.GATEWAY_INTERNAL_URL,
     config.AGENT_RUNTIME_LLM_API_KEY,
+    fetch,
+    telemetry.tracer,
   );
   const orchestrator = new AgentOrchestrator({
     llm,

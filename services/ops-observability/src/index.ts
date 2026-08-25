@@ -10,6 +10,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, "shutting down");
     await app.telemetry.shutdown();
+    await app.closeStores();
     await app.close();
     process.exit(0);
   };

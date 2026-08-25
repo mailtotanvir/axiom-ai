@@ -16,6 +16,15 @@ exporters:
     endpoint: jaeger:4317
     tls:
       insecure: true
+  # Durable trace store (O1): the exporter self-creates the axiom.otel_traces
+  # table in OTel schema; global retention baseline is 31 days, per-tenant
+  # policies are enforced at query time by the ops plane.
+  clickhouse:
+    endpoint: tcp://clickhouse:9000?dial_timeout=10s
+    database: axiom
+    username: axiom
+    password: axiom
+    ttl: 744h
   debug:
     verbosity: basic
 
@@ -24,4 +33,4 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp/jaeger, debug]
+      exporters: [otlp/jaeger, clickhouse, debug]

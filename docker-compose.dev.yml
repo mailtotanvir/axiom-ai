@@ -94,7 +94,10 @@ services:
       - "4317:4317"
       - "4318:4318"
     depends_on:
-      - jaeger
+      jaeger:
+        condition: service_started
+      clickhouse:
+        condition: service_healthy
 
   traefik:
     image: traefik:v3.5
@@ -183,6 +186,8 @@ services:
       AXIOM_ENV: ${AXIOM_ENV:-development}
       OBSERVABILITY_PORT: "4000"
       POSTGRES_DB_URI: postgresql://axiom:axiom@postgres:5432/axiom_metadata
+      CLICKHOUSE_NODES: axiom:axiom@clickhouse:8123
+      TRACE_RETENTION_DEFAULT_DAYS: "30"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       # Host 4000 can collide with other local tooling; container keeps spec port 4000.

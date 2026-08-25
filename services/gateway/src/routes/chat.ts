@@ -17,7 +17,15 @@ import { z } from "zod";
 
 import type { ProviderAdapter, UpstreamResult } from "../providers/types.js";
 import type { ChatCompletionRequest, TenantContext } from "@axiom-ai/core";
-import { AxiomError, errors, otel, withSpan } from "@axiom-ai/core";
+import {
+  AxiomError,
+  axiomAttr,
+  errors,
+  llmAttr,
+  otel,
+  withLlmSpan,
+  type LlmCallOutcome,
+} from "@axiom-ai/core";
 
 import type { GatewayRuntime } from "../runtime.js";
 import { resolveTenant } from "../auth/middleware.js";
@@ -163,6 +171,7 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
         clientAbort,
         traceHeaders,
         cacheKey,
+        requestId: request.id,
       });
       return;
     }
@@ -176,6 +185,8 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
           candidates: resolveCandidates(runtime, effectiveRequest),
           clientAbort,
           traceHeaders,
+          tenant,
+          requestId: request.id,
         }),
     );
 
@@ -286,6 +297,8 @@ interface FailoverDeps {
   candidates: ProviderAdapter[];
   clientAbort: AbortController;
   traceHeaders: Record<string, string>;
+  tenant?: TenantContext;
+  requestId?: string;
 }
 
 /**
@@ -312,10 +325,34 @@ async function attemptProviders<T>(
       continue;
     }
     const startedAt = Date.now();
-    const result = await withSpan(app.telemetry.tracer, `gateway.upstream.${adapter.id}`, {}, async () =>
-      deps.effectiveRequest.stream === true
-        ? adapter.stream({ body: deps.effectiveRequest, signal: deps.clientAbort.signal, headers: deps.traceHeaders })
-        : adapter.complete({ body: deps.effectiveRequest, signal: deps.clientAbort.signal, headers: deps.traceHeaders }),
+    // O1: Gen-AI semantic-convention span so the ops plane can reconstruct
+    // tokens/model/tenant per upstream attempt from ClickHouse traces.
+    const result = await withLlmSpan(
+      app.telemetry.tracer,
+      `gateway.upstream.${adapter.id}`,
+      {
+        [llmAttr.system]: adapter.id,
+        [llmAttr.requestModel]: deps.effectiveRequest.model,
+        ...(deps.tenant !== undefined
+          ? { [axiomAttr.tenantId]: deps.tenant.tenantId, [axiomAttr.projectId]: deps.tenant.projectId }
+          : {}),
+        ...(deps.requestId !== undefined ? { [axiomAttr.requestId]: deps.requestId } : {}),
+      },
+      async () => {
+        const callResult = await (deps.effectiveRequest.stream === true
+          ? adapter.stream({ body: deps.effectiveRequest, signal: deps.clientAbort.signal, headers: deps.traceHeaders })
+          : adapter.complete({ body: deps.effectiveRequest, signal: deps.clientAbort.signal, headers: deps.traceHeaders }));
+        const outcome: LlmCallOutcome = {};
+        if (callResult.ok && callResult.json !== undefined) {
+          const reported = extractReportedUsage(callResult.json);
+          if (reported?.promptTokens !== undefined || reported?.completionTokens !== undefined) {
+            const inputTokens = reported.promptTokens ?? 0;
+            const outputTokens = reported.completionTokens ?? 0;
+            outcome.usage = { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens };
+          }
+        }
+        return { value: callResult, outcome };
+      },
     );
 
     if (!result.ok) {

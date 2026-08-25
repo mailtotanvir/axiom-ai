@@ -8,6 +8,8 @@ export const opsConfigSchema = baseConfigSchema
     OBSERVABILITY_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
     OBSERVABILITY_HOST: z.string().default("0.0.0.0"),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+    /** Global baseline; per-tenant policies narrow this further at query time. */
+    TRACE_RETENTION_DEFAULT_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
   });
 
 export type OpsConfig = z.infer<typeof opsConfigSchema>;
