@@ -318,10 +318,26 @@ Updated at the end of every completed phase.
 | 0 — Foundation & Contracts | **Complete** (2026-08-24) | All — see below | C1, C2, X1–X4 delivered; commits `20d99b3..HEAD` |
 | 1 — Gateway MVP | **Complete** (2026-08-24) | All — see below | G1–G7 delivered; commits `a37fb9e`, `6615c55` |
 | 1.1 — Gateway input caching | **Complete** (2026-08-24) | n/a (addendum) | Exact-match tenant-scoped cache + provider-native prompt-cache metering for OpenAI/Anthropic families; commit `59e559b` |
-| 2 — RAG Pipeline | **Deferred by owner decision** (moved after Phase 3) | — | Scaffold + API contracts stand from Phase 0; epics R1–R6 pending |
 | 3 — Agent Runtime | **Complete** (2026-08-24) | All — see below | A1–A5 delivered (Temporal deferred per D2); commits `2aa9473`, `bc8e9b2`, `367f0a1`, `4497fce` |
-| 4 — Ops & Observability | Not started | — | — |
+| 2 — RAG Pipeline | **Complete** (2026-08-25) | All, with recorded deviations | R1–R6 delivered; Celery workers, Unstructured, Redis vector search, and native Qdrant sparse indexes deferred as scale-outs |
+| 4 — Ops & Observability | **In progress** (started 2026-08-25) | Pending | O1–O6 implementation underway |
 | 5 — Hardening & Launch | Not started | — | — |
+
+### Phase 2 exit-criteria review (2026-08-25)
+
+| Criterion | Result |
+|-----------|--------|
+| 100-page corpus ingested/queryable E2E <60s | Done — deterministic regression covers submit → indexed → retrieve within budget |
+| Cache hit avoids recomputation | Done — exact and semantic tiers return cached citations; semantic lookup is proven without embedding-provider calls on hits |
+| Tenant isolation red-team clean | Done — HMAC verification, credential-derived tenant scope, structural Postgres/Qdrant/cache partitioning, quota enforcement |
+| recall@10 gate in CI | Done — deterministic 10-topic golden set scores 1.00 with a ≥0.9 CI gate |
+
+**Accepted deviations:** FastAPI background tasks replace Celery for v1;
+native markdown/HTML/text plus optional PDF parsing replaces Unstructured;
+the semantic similarity tier uses Qdrant ([ADR
+0008](docs/adr/0008-semantic-cache-in-qdrant.md)); BM25 fusion runs over dense
+candidates at the service layer; the exact-cache tier is process-local until
+multi-worker scale-out. These are documented in the test evidence log.
 
 ### Phase 3 exit-criteria review (2026-08-24)
 

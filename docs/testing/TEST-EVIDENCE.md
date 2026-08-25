@@ -13,7 +13,7 @@ command to re-run. Dates are execution dates; commit SHAs pin the code state.
 | 2026-08-24 | core-shared (vitest) | `npm test -w @axiom-ai/core` | **18 passed** | — |
 | 2026-08-24 | agent-runtime scaffold (vitest) | `npm test -w @axiom-ai/agent-runtime` | **3 passed** | — |
 | 2026-08-24 | ops-observability (vitest) | `npm test -w @axiom-ai/ops-observability` | **2 passed** | — |
-| 2026-08-24 | rag-pipeline (pytest) | `.venv/bin/python -m pytest -q` | **5 passed** | — |
+| 2026-08-25 | rag-pipeline (pytest) | `.venv/bin/python -m pytest -q` | **43 passed** | — |
 | 2026-08-24 | Live provider contracts | `RUN_LIVE_CONTRACT_TESTS=1 npx vitest run --root services/gateway test/liveContracts.test.ts` | **10 passed** (2 environmental skips inside) | `59e559b`+ |
 | 2026-08-24 | Full-stack smoke (compose) | `scripts/smoke.sh localhost` | **8/8 checks passed** | — |
 | 2026-08-24 | Lint/typecheck | `npx eslint …`, `make typecheck` | **0 errors** | — |
@@ -122,6 +122,43 @@ gateway defects.
 
 Test totals at phase exit: **23 vitest passing** in agent-runtime (+3
 Redis-gated webhook integration tests via `TEST_WEBHOOKS_INTEGRATION=1`).
+
+## Phase 2 — RAG Pipeline (exit 2026-08-25)
+
+### Exit criteria
+
+| Criterion | Evidence |
+|-----------|----------|
+| 100-page mixed-format corpus ingested and queryable E2E < 60s | `test_recall_and_perf.py > test_100_page_corpus_ingest_and_query_under_60_seconds`: 100 markdown pages (~2500 chars each) submitted, drained to `indexed`, and queried in one budgeted run |
+| Cache hit serves answer without recomputation | `test_knowledge_flow.py > test_exact_cache_serves_second_identical_query`: second identical query returns `served_from_cache: true` with byte-identical chunks; semantic tier proven by trigram-overlap paraphrase lookup (`test_cache_retrieval.py`) with no embedding API call on the hit path (httpx MockTransport asserts call counts) |
+| Isolation suite passes (red-team clean) | `test_tenant_isolation.py` (9): forged/mismatched HMAC signatures rejected, tenant claimed from verified credentials only, crafted filters cannot cross tenants, Qdrant/Postgres/cache scopes all structurally partitioned, quota accounting enforced (402) |
+| Authenticated smoke path | `scripts/smoke.sh localhost` signs the knowledge retrieve request with the inter-service secret; no unauthenticated stub remains |
+| recall@10 regression gate wired into CI | `test_recall_and_perf.py > test_golden_set_recall_at_10_gate`: deterministic 10-topic golden set over the seeded corpus; currently **1.00** vs. gate ≥ 0.9; runs on every CI build |
+
+### Suite breakdown (43 passing)
+
+| File | Tests | Covers |
+|------|-------|--------|
+| `test_chunking_parsers.py` | 12 | Markdown heading/paragraph splits, HTML→text, sentence-window overlap, lossless reassembly, source-span offsets, parser registry fallbacks |
+| `test_cache_retrieval.py` | 13 | Exact + similarity cache tiers, TTL, per-document invalidation, RRF fusion ranking, citation payload shape, batch-order-stable embeddings (MockTransport) |
+| `test_tenant_isolation.py` | 9 | Cross-tenant red team (R5) |
+| `test_knowledge_flow.py` | 8 | Ingest→index→retrieve E2E with citations, dedupe idempotency, corrupt-PDF failure → reprocess recovery, delete removes vectors + caches, quota 402 |
+| `test_recall_and_perf.py` | 4 | Golden-set recall@10 gate, fixture completeness, 100-page perf budget |
+
+### Scope notes / deviations from plan
+
+- Celery workers and Unstructured are **deferred**: Phase 2 uses FastAPI
+  background tasks plus native markdown/HTML/text parsers and optional
+  `pypdf`; the Celery topology and parser registry remain pluggable seams
+  (`app/workers/celery_app.py`, `app/core/parsers.py`).
+- Semantic cache similarity lives in **Qdrant** rather than Redis vector
+  search — see [ADR 0008](../adr/0008-semantic-cache-in-qdrant.md). The exact
+  tier is process-local; the Redis helper is the multi-worker scale-out seam.
+- Embeddings default to deterministic feature hashing for self-contained
+  dev/tests; OpenAI-compatible and sentence-transformers providers are wired
+  behind the same interface.
+- Hybrid search fuses dense candidates with BM25 via Reciprocal Rank Fusion
+  at the service layer; a native Qdrant sparse index is the scale-out path.
 
 ## Reproducing
 

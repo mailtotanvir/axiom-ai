@@ -134,11 +134,18 @@ services:
       context: services/rag-pipeline
     environment:
       AXIOM_ENV: ${AXIOM_ENV:-development}
+      AXIOM_INTER_SERVICE_SECRET: ${AXIOM_INTER_SERVICE_SECRET:-dev-only-inter-service-secret}
       REDIS_PRIMARY_URL: redis://redis:6379/1
+      POSTGRES_DB_URI: postgresql://axiom:axiom@postgres:5432/axiom_metadata
+      QDRANT_URL: http://qdrant:6333
     ports:
       - "8000:8000"
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
 
   agent-runtime:

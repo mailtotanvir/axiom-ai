@@ -5,6 +5,8 @@
 set -euo pipefail
 
 HOST="${1:-localhost}"
+SECRET="${AXIOM_INTER_SERVICE_SECRET:-dev-only-inter-service-secret}"
+TENANT="axiom-smoke"
 FAILURES=0
 
 check() {
@@ -18,14 +20,27 @@ check() {
   fi
 }
 
+signed_knowledge_headers() {
+  local body="$1" timestamp body_hash canonical signature
+  timestamp="$(date +%s)"
+  body_hash="$(printf '%s' "$body" | openssl dgst -sha256 -hex | awk '{print $NF}')"
+  canonical="${timestamp}.${body_hash}.${TENANT}"
+  signature="$(printf '%s' "$canonical" | openssl dgst -sha256 -hmac "$SECRET" -hex | awk '{print $NF}')"
+  printf -- '-H\ncontent-type: application/json\n-H\nx-axiom-tenant: %s\n-H\nx-axiom-signature: t=%s,v1=%s\n' \
+    "$TENANT" "$timestamp" "$signature"
+}
+
 echo "Axiom AI smoke test against $HOST"
 check "gateway /healthz"     "http://$HOST:3000/healthz" '"status":"ok"'
 check "rag-pipeline /healthz" "http://$HOST:8000/healthz" '"status":"ok"'
 check "agent-runtime /healthz" "http://$HOST:5000/healthz" '"status":"ok"'
 check "ops-observability /healthz" "http://$HOST:14000/healthz" '"status":"ok"'
 check "gateway model catalog" "http://$HOST:3000/v1/models" 'gemini-3.6-flash'
-check "rag retrieval stub"    "http://$HOST:8000/v1/knowledge/retrieve" 'served_from_cache' \
-  -H 'content-type: application/json' -d '{"query":"smoke test","top_k":3}'
+
+knowledge_body='{"query":"smoke test","top_k":3}'
+mapfile -t KNOWLEDGE_HEADERS < <(signed_knowledge_headers "$knowledge_body")
+check "rag retrieval API"     "http://$HOST:8000/v1/knowledge/retrieve" 'served_from_cache' \
+  "${KNOWLEDGE_HEADERS[@]}" -d "$knowledge_body"
 check "clickhouse ping"      "http://$HOST:8123/ping" 'Ok.'
 check "qdrant readiness"     "http://$HOST:6333/readyz" 'all shards are ready'
 
