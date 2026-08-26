@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I Built an Operating System for AI. It Humbled Me.</title>
+<style>
+  :root {
+    /* surface scale: near-black with a cool cast (encyclopedia token system) */
+    --bg: #04070A;
+    --surface-1: #060C11;
+    --surface-2: #0A141B;
+    --surface-3: #10202B;
+    --card: rgba(233,244,241,0.03);
+    --line: rgba(159,182,187,0.14);
+    /* ink scale */
+    --text: #E9F4F1;
+    --dim: #9FB6BB;
+    --faint: #5E767C;
+    /* signal hues: each hierarchy level owns exactly one hue */
+    --blue: #5CC8FF;      /* gateway / thread hue */
+    --green: #46E3C8;     /* live / execution */
+    --amber: #FFC46B;     /* ops / control */
+    --violet: #A48FFF;    /* agent / block hue */
+    --pink: #FF7FA5;      /* memory / data-at-rest */
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    --sans: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    --display: 'Space Grotesk', var(--sans);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:32px; }
+  body {
+    background:
+      radial-gradient(ellipse 90% 55% at 50% -12%, rgba(92,200,255,0.09), transparent),
+      radial-gradient(ellipse 50% 40% at 100% 30%, rgba(164,143,255,0.05), transparent),
+      var(--bg);
+    color: var(--text); font-family: var(--sans);
+    line-height: 1.8; font-size: 17.5px;
+  }
+
+  /* reading progress */
+  #progress {
+    position: fixed; top:0; left:0; height:3px; width:0%;
+    background: linear-gradient(90deg, var(--green), var(--blue), var(--violet));
+    box-shadow: 0 0 12px rgba(92,200,255,.55);
+    z-index: 100; transition: width .08s linear;
+  }
+
+  .layout {
+    max-width: 1240px; margin: 0 auto;
+    display: grid; grid-template-columns: 250px minmax(0, 760px) 60px;
+    gap: 48px; padding: 0 24px;
+  }
+  @media (max-width: 1080px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    nav.toc { display: none; }
+  }
+
+  /* ---------- sidebar TOC ---------- */
+  nav.toc { padding-top: 120px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; scrollbar-width: thin; }
+  .toc-label { font-family: var(--mono); font-size: 9.5px; letter-spacing: .3em; color: var(--faint); text-transform: uppercase; margin-bottom: 16px; display:flex; align-items:center; gap:8px; }
+  .toc-label::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 6px rgba(70,227,200,.8); animation:pulse 2.4s ease-in-out infinite; }
+  nav.toc ol { list-style: none; counter-reset: toc; display: grid; border-left: 1px solid var(--line); }
+  nav.toc li { counter-increment: toc; }
+  nav.toc li a {
+    display: flex; align-items: baseline; gap: 10px; padding: 8px 16px; margin-left: -1px;
+    border-left: 2px solid transparent; font-size: 13px; color: var(--dim);
+    text-decoration: none; transition: all .18s; line-height: 1.4;
+  }
+  nav.toc li a::before {
+    content: "0" counter(toc); font-family: var(--mono); font-size: 9.5px;
+    color: var(--faint); transition: color .18s;
+  }
+  nav.toc li a:hover { color: var(--text); border-left-color: rgba(92,200,255,.4); transform: translateX(2px); }
+  nav.toc li a:hover::before { color: var(--blue); }
+  nav.toc li a.active { color: #fff; border-left-color: var(--blue); background: linear-gradient(90deg, rgba(92,200,255,.08), transparent); }
+  nav.toc li a.active::before { color: var(--green); }
+
+  article { padding-top: 96px; padding-bottom: 140px; min-width: 0; }
+
+  /* ---------- hero ---------- */
+  .kicker {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .kicker::before { content: ""; width: 28px; height: 1px; background: var(--green); }
+  h1 {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(40px, 6.5vw, 68px);
+    line-height: 1.05; letter-spacing: -0.025em;
+  }
+  h1 em { font-style: italic; color: var(--green); }
+  .standfirst { font-size: 20px; color: var(--dim); margin-top: 30px; max-width: 660px; line-height: 1.7; }
+  .meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 34px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--dim); }
+  .meta span { border: 1px solid var(--line); border-radius: 999px; padding: 7px 16px; background: rgba(233,244,241,0.02); }
+  .meta span::before { content: "●"; font-size: 7px; vertical-align: 2px; margin-right: 8px; color: var(--green); }
+  .meta span:nth-child(2)::before { color: var(--blue); }
+  .meta span:nth-child(3)::before { color: var(--amber); }
+
+  h2 {
+    font-family: var(--display); font-size: clamp(26px, 3vw, 32px); letter-spacing: -.015em;
+    font-weight: 700; margin: 96px 0 10px; scroll-margin-top: 40px; line-height: 1.2;
+  }
+  h2::before { content: ""; display:block; width: 44px; height: 2px; background: var(--line); position: relative; margin-bottom: 22px; }
+  h2::after { content: ""; display:block; width: 16px; height: 2px; background: var(--green); margin: -2px 0 0; transition: width .35s ease; }
+  h2:hover::after { width: 44px; }
+  h2 .chap {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .28em;
+    color: var(--faint); text-transform: uppercase; margin-bottom: 14px; font-weight: 400;
+  }
+  h2 .chap::before { content: "▸"; font-size: 9px; }
+  h3 { font-family: var(--display); font-size: 18.5px; margin: 36px 0 8px; letter-spacing: -.005em; }
+
+  /* section index numbers, encyclopedia style */
+  h2 { counter-increment: chapter; }
+  h2 .chap::after { content: "CH · " counter(chapter); margin-left: auto; color: var(--faint); opacity: .7; }
+  body { counter-reset: chapter; }
+  p { margin: 17px 0; }
+  .lead-in { font-family: var(--display); color: var(--text); }
+  .dim { color: var(--dim); }
+  a { color: var(--blue); text-decoration: none; } a:hover { text-decoration: underline; }
+  strong { font-weight: 650; color: #fff; }
+
+  blockquote {
+    margin: 38px 0; padding: 30px 34px; border-radius: 16px;
+    background: linear-gradient(135deg, rgba(92,200,255,.06), rgba(164,143,255,.03)), var(--surface-1);
+    border: 1px solid rgba(92,200,255,.22);
+    font-family: var(--display); font-size: clamp(19px, 2.2vw, 23px); line-height: 1.55;
+    position: relative; overflow: hidden;
+  }
+  blockquote::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, var(--blue), var(--violet));
+  }
+
+  pre { background: var(--surface-1); border:1px solid var(--line); border-radius:12px; padding:20px 22px; overflow-x:auto; margin:20px 0; font-family:var(--mono); font-size:13px; line-height:1.7; color:#B9D2DC; }
+  code { font-family:var(--mono); font-size:.86em; background: rgba(92,200,255,.09); border: 1px solid rgba(92,200,255,.14); padding:2px 7px; border-radius:5px; color:#8ED4FF; }
+  pre code { background:none; padding:0; color:inherit; }
+
+  table { width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; background: var(--surface-1); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th { font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.18em; color:var(--faint); text-align:left; padding:13px 16px; border-bottom:1px solid var(--line); background: rgba(233,244,241,.02); }
+  td { padding:13px 16px; border-bottom:1px solid rgba(159,182,187,.08); vertical-align:top; color:var(--dim); }
+  tr:last-child td { border-bottom:none; }
+  td:first-child { white-space:nowrap; font-weight:600; color:var(--text); }
+  tbody tr, table tr { transition: background .15s; }
+  table tr:hover td { background: rgba(92,200,255,.03); }
+
+  .aside {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px 28px; margin: 30px 0; position: relative; overflow: hidden;
+  }
+  .aside::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--faint); }
+  .aside.warn { background: linear-gradient(90deg, rgba(255,196,107,.06), transparent 55%), var(--surface-1); }
+  .aside.warn::before { background: var(--amber); }
+  .aside.good { background: linear-gradient(90deg, rgba(70,227,200,.06), transparent 55%), var(--surface-1); }
+  .aside.good::before { background: var(--green); }
+  .aside.bad  { background: linear-gradient(90deg, rgba(255,127,165,.06), transparent 55%), var(--surface-1); }
+  .aside.bad::before { background: #FF7FA5; }
+  .aside .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .26em; text-transform: uppercase;
+    display:inline-block; margin-bottom: 12px; padding: 4px 12px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--dim); background: rgba(233,244,241,.03);
+  }
+  .aside.warn .tag{color:var(--amber); border-color:rgba(255,196,107,.3)}
+  .aside.good .tag{color:var(--green); border-color:rgba(70,227,200,.3)}
+  .aside.bad .tag{color:#FF7FA5; border-color:rgba(255,127,165,.3)}
+  .aside p { margin: 8px 0; font-size: 15.5px; color: var(--dim); }
+  .aside p strong { color: var(--text); }
+
+  /* mermaid: framed instruments with a mono header strip */
+  .mermaid-frame {
+    background: var(--surface-1); border:1px solid var(--line); border-radius:14px;
+    margin:26px 0; overflow:hidden;
+  }
+  .mermaid-frame .frame-bar {
+    display:flex; align-items:center; gap:10px;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--faint); padding:11px 18px; border-bottom:1px solid var(--line);
+    background: rgba(233,244,241,.02);
+  }
+  .frame-bar .dot { width:6px; height:6px; border-radius:50%; background: var(--green); box-shadow: 0 0 8px rgba(70,227,200,.7); animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .frame-bar .live { margin-left:auto; color: var(--green); }
+  .mermaid {
+    background:#04070A; padding:26px 18px; overflow-x:auto;
+    display:flex; justify-content:center;
+  }
+  .mermaid svg { max-width:100%; height:auto; }
+
+  /* interactive deep-dive toggles */
+  details {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    margin: 20px 0; overflow: hidden;
+  }
+  summary {
+    cursor: pointer; list-style: none; padding: 17px 24px;
+    font-family: var(--mono); font-size: 13.5px; color: var(--blue);
+    display: flex; align-items: center; gap: 10px; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "+"; font-size: 17px; transition: transform .2s; }
+  details[open] summary::before { transform: rotate(45deg); }
+  details[open] summary { border-bottom: 1px solid var(--line); }
+  details .inner { padding: 8px 24px 20px; font-size: 15.5px; color: var(--dim); }
+  details .inner p { margin: 10px 0; }
+  details .inner strong { color: var(--text); }
+
+  .chapter-end { text-align:center; margin: 80px 0 0; color: var(--faint); font-family: var(--mono); font-size: 11px; letter-spacing: .5em; }
+
+  footer {
+  margin-top: 100px; padding: 36px 30px; border: 1px solid var(--line);
+  border-radius: 16px; background: var(--surface-1); color: var(--dim); font-size: 14.5px;
+}
+footer p:first-child strong { color: var(--text); font-family: var(--display); letter-spacing: .01em; }
+footer .sig { font-family: var(--mono); font-size: 10px; letter-spacing: .28em; text-transform: uppercase; color: var(--faint); display:block; margin-bottom: 14px; }
+footer .sig::before { content:"●"; color: var(--green); font-size: 7px; vertical-align: 2px; margin-right: 10px; animation:pulse 2.4s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<div id="progress"></div>
+
+<div class="layout">
+
+<!-- ================= SIDEBAR ================= -->
+<nav class="toc" aria-label="Chapters">
+  <div class="toc-label">The story so far</div>
+  <ol>
+    <li><a href="#week">The week it all broke</a></li>
+    <li><a href="#rule">One rule before line one</a></li>
+    <li><a href="#bouncer">Hiring a bouncer for my API keys</a></li>
+    <li><a href="#memory">Teaching software to remember</a></li>
+    <li><a href="#agents">The agent that could not be killed</a></li>
+    <li><a href="#witness">The witness stand</a></li>
+    <li><a href="#glue">Five repos, one handshake</a></li>
+    <li><a href="#topology">Lift the hood</a></li>
+    <li><a href="#empty">The bug that left no trace</a></li>
+    <li><a href="#what-i-learned">What I'd tell you over coffee</a></li>
+    <li><a href="#fine-print">The part most posts skip</a></li>
+  </ol>
+</nav>
+
+<!-- ================= ARTICLE ================= -->
+<article>
+
+<div class="kicker">A build story &nbsp;·&nbsp; Axiom AI &nbsp;·&nbsp; four months of evenings</div>
+<div style="font-family:var(--mono); font-size:11px; color:var(--faint); letter-spacing:.12em; margin-bottom:18px;">
+  <span style="color:var(--green);">● SYSTEM LIVE</span>&nbsp;&nbsp;
+  <span>5 PACKAGES</span>&nbsp;&nbsp;
+  <span>198 TESTS</span>&nbsp;&nbsp;
+  <span>8 ADRS</span>&nbsp;&nbsp;
+  <span>1 TRACE ID</span>
+</div>
+<h1>I built an operating system for AI.<br>It <em>humbled me.</em></h1>
+
+<p class="standfirst">This is not a post about prompts. It's about what happens after the prompt works: the outage you didn't plan for, the bill nobody can explain, and the question "why did it say that?" when your whole career is on the line. I rebuilt the layer under every AI app I've ever shipped. Here's what happened, including the bug that made me look like a fool to my own test suite.</p>
+
+<div class="meta">
+  <span><b>Reading time</b> ~18 min</span>
+  <span><b>Code</b> TypeScript + Python, Apache-2.0</span>
+  <span><b>Proof</b> 198 tests, every claim linked</span>
+</div>
+
+<!-- ========== CH 1 ========== -->
+<h2 id="week"><span class="chap">Chapter One</span>The week it all broke</h2>
+
+<p>Let me start with the moment my relationship with AI engineering changed. Not a success story. An outage.</p>
+
+<p>A provider I depended on had a partial failure. Nothing dramatic, just enough degraded responses to poison my app. And here's the thing that kept me staring at the ceiling that night: <strong>there was no seam anywhere in my code where a second provider could have existed.</strong> The SDK call sat directly in the request path like a load-bearing wall. To add a fallback, I would have had to rebuild the room.</p>
+
+<p>That same week, two more walls came down. A stakeholder asked me which prompt version and which model produced a specific bad output, and roughly what it cost us. I opened my editor, scrolled through prompts pasted between functions like comments, and realized the honest answer was: <i>nobody knows, and nothing was designed to know.</i></p>
+
+<p>And then I watched an agent burn through tokens retrying a failing tool call. No budget. No cap. No event history. It failed silently until someone noticed the bill.</p>
+
+<blockquote>The models were fine that week. Every single failure was mine. They were plumbing failures, accounting failures, custody failures. The boring kind of failure that software engineering solved decades ago for databases and message queues. The AI industry just hadn't gotten the memo yet.</blockquote>
+
+<p>So I made an unreasonable decision. I would stop assembling features and build the substrate properly: a gateway, a knowledge pipeline, an agent engine, a control plane, and a shared contract library. Five packages. Production rules. If a claim couldn't be proven by a test, it didn't go in the README.</p>
+
+<p>This is the story of building it, told honestly, including the parts where the system outsmarted me.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 2 ========== -->
+<h2 id="rule"><span class="chap">Chapter Two</span>One rule before line one</h2>
+
+<p>Before writing code, I wrote down how the project could fail. Not runtime failures. <i>Project</i> failures: phases that end when enthusiasm ends, scope that grows because nothing stops it, quality that decays because "done" means different things on different days.</p>
+
+<p>The countermeasure was one rule, enforced ruthlessly:</p>
+
+<blockquote>A phase doesn't exit when its code exists. It exits when its evidence exists.</blockquote>
+
+<p>Every phase got exit criteria written <i>before</i> implementation, each mapped to named test files. Gateway couldn't close until three providers failed over live. Agent runtime couldn't close until I killed a worker mid-run and proved it resumed without repeating itself. RAG couldn't close until a red-team suite failed to cross tenant lines.</p>
+
+<p>The rule changed my relationship with testing. Tests stopped being the tax you pay after building and became the proof-of-reality layer the whole project stands on. When I later claimed "one trace follows a request across four services," that wasn't marketing copy. There is a test file that asserts the actual bytes of the trace header. Hold that thought, because that test is also where this story gets embarrassing.</p>
+
+<p>Execution itself was agentic. I ran an AI dev-engine as a pair, but the division of labor mattered more than the tooling: the agents wrote code fast; <strong>the criteria decided what counted.</strong> On the days everything looked finished, the criteria said otherwise, and the criteria were right. More than once.</p>
+
+<div class="aside good">
+  <span class="tag">Worth stealing</span>
+  <p>If you take one practice from this post: write the definition of done first, make it testable, and let it argue with you. It's the cheapest senior engineer you'll ever hire.</p>
+</div>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 3 ========== -->
+<h2 id="bouncer"><span class="chap">Chapter Three</span>Hiring a bouncer for my API keys</h2>
+
+<p>Every AI app has a moment where a user's words become someone else's API call. That moment is where money leaks, outages begin, and costs become unexplainable. So that's where the build started: <strong>a gateway</strong>, a service whose entire job is to stand between your application and the model providers and impose order.</p>
+
+<p>The pitch sounds simple. Proxy chat completions across Groq, Mistral, Gemini, SiliconFlow, NVIDIA NIM, all speaking OpenAI's wire format. The devil is in what "impose order" means:</p>
+
+<table>
+  <tr><th>When reality happens</th><th>What the gateway does instead</th></tr>
+  <tr><td>A provider starts returning 500s</td><td>A circuit breaker trips after consecutive failures, half-open probes test recovery, traffic walks a deterministic fallback chain. Proven E2E by executing two of three mock providers mid-request.</td></tr>
+  <tr><td>Someone discovers your endpoint</td><td>API-key auth with hashed storage, tenant claims, per-tenant model allowlists, sliding-window rate limits in Redis. Burst-tested with an exact 200/200/429 sequence and proper quota headers.</td></tr>
+  <tr><td>The finance team asks what a customer costs</td><td>Tokens metered per request into ClickHouse, reconciled against provider-reported usage to within zero tokens on fixture runs. Estimator drift is tracked separately, honestly, as <code>reconciliation_delta</code>.</td></tr>
+  <tr><td>The same prompt arrives ten thousand times</td><td>A tenant-scoped input cache answers instantly, and provider-native prompt-cache discounts are metered too, so the savings show up in the ledger instead of vanishing.</td></tr>
+</table>
+
+<details>
+<summary>The detail that separates a proxy from a product: streaming under chaos</summary>
+<div class="inner">
+  <p>SSE passthrough runs over hijacked sockets with true backpressure, keep-alives, and client-disconnect propagation. The test suite kills upstream connections mid-stream deliberately. Clients receive exactly what made it through, no phantom completions, and the metering sink still records partial usage correctly.</p>
+  <p>There's also a latency gate: sub-15ms added overhead non-streaming, sub-5ms TTFB impact streaming. When your product is a middleman, its weight is the metric. The benchmark runs with a subtracted baseline and a stated CI-noise allowance because fake precision is worse than honest error bars.</p>
+</div>
+</details>
+
+<details>
+<summary>Under the hood: one request through the gateway</summary>
+<div class="inner">
+<div class="mermaid-frame"><div class="frame-bar"><span class="dot"></span><span class="t">system diagram</span><span class="live">rendered live</span></div>
+<div class="mermaid">
+flowchart TD
+    A["client<br/>POST /v1/chat/completions<br/>Bearer ax_..."] --> B["resolveTenant<br/>keyHash → tenant claims"]
+    B --> C["Zod schema validation<br/>on wire body"]
+    C --> D["experiment engine<br/>sticky bucket(salt, sessionKey)"]
+    D -->|"arm: model override /<br/>prompt template"| E
+    D --> E["rate limit check<br/>sliding window in Redis<br/>→ x-ratelimit-* headers"]
+    E --> F{"input cache hit?<br/>(tenant-scoped)"}
+    F -->|"yes"| G["serve cached completion<br/>+ meter it, then done"]
+    F -->|"no"| H["extract W3C traceparent<br/>open gateway.chat server span"]
+    H --> I["circuit breaker picks chain:<br/>model's provider → defaultChain"]
+    I --> J["adapter.complete / stream<br/>SSE hijack or buffered JSON"]
+    J --> K["meter row → ClickHouse<br/>(async batched sink)"]
+
+    style A fill:#141B2B,stroke:#9AA4B8,color:#E8ECF4
+    style D fill:#1A1608,stroke:#FFC46B,color:#FFC46B
+    style F fill:#0F1D16,stroke:#46E3C8,color:#46E3C8
+    style G fill:#0F1D16,stroke:#46E3C8,color:#46E3C8
+    style H fill:#101A2C,stroke:#5CC8FF,color:#5CC8FF
+    style K fill:#101A2C,stroke:#5CC8FF,color:#5CC8FF
+</div>
+</div>
+<p>Two details worth pausing on. The experiment resolves at step three, before the allowlist check, so an arm's model override passes through the exact same tenant policy as a client-chosen model; there is no privileged bypass path. And the metering sink is async and batched, so billing writes never sit inside the request's critical path.</p>
+</div>
+</details>
+
+<p>My favorite piece hides in the economics. Most teams treat caching as an optimization footnote. Here it's a first-class subsystem with its own dashboard, its own hit-rate metrics, and its own honest limitation recorded in the docs: the exact-match tier is process-local until the multi-worker scale-out lands. Saying what isn't done is part of the feature.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 4 ========== -->
+<h2 id="memory"><span class="chap">Chapter Four</span>Teaching software to remember (without leaking)</h2>
+
+<p>Retrieval looks easy. Embed documents, search vectors, return chunks. Every tutorial ends there. Production begins where the tutorials end, with three questions nobody asks until the audit:</p>
+
+<h3>Whose memory is this?</h3>
+<p>In a multi-tenant system, the scariest bug class is silent crossover: customer A's document fragment surfacing in customer B's answer. My rule became structural: <strong>tenant scope comes from verified credentials and is enforced by the data layer itself.</strong> A caller cannot pass filters that cross tenants, because the mandatory claim filter is not the caller's to modify. Then I hired an adversary. Nine red-team tests try forged signatures, mismatched credentials, crafted filter payloads, cache probing across boundaries. All of them fail closed. That suite passing matters more to me than any benchmark score in this post.</p>
+
+<h3>How do we answer the same question twice, for free?</h3>
+<p>A two-tier cache. Exact matches short-circuit entirely. Paraphrases hit a similarity tier backed by Qdrant. The interesting part isn't the hit, it's proving the hit is <i>free</i>: the test asserts zero embedding-provider calls on the hit path via transport mocking. Anyone can claim a semantic cache saves money. This one has a test that counts API calls.</p>
+
+<h3>Is retrieval actually good?</h3>
+<p>"Feels accurate" is not an engineering property. A golden set of topics drives a recall@10 regression gate wired into CI, scoring every build. Currently 1.00 against a threshold of 0.9. If a chunker change quietly degrades retrieval, CI turns red before any human notices something feels off. Chunkers themselves are property-tested for lossless reassembly, because if chunking silently drops characters, nothing downstream, including your evals, can detect it.</p>
+
+<div class="aside warn">
+  <span class="tag">Deviation log</span>
+  <p>The plan originally specified Celery workers and the Unstructured parser library. Reality: FastAPI background tasks plus native markdown/HTML/text parsing covered v1's needs completely. Rather than pretend, the tracker records this as an accepted deviation with the pluggable seams left in place. Changing your mind cheaply is what architecture records are for.</p>
+</div>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 5 ========== -->
+<h2 id="agents"><span class="chap">Chapter Five</span>The agent that could not be killed</h2>
+
+<p>Agents are where demos go to die. In a demo, the loop completes. In production, the worker gets OOM-killed mid-plan, the tool hangs forever, the webhook receiver is down for maintenance, and someone asks why the agent "did that." This package exists to answer those moments.</p>
+
+<h3>Kill it. It comes back.</h3>
+<p>Agent execution is event-sourced: every step, plan, tool call, observation, persisted as it happens. The signature test literally kills the worker mid-run and brings up a fresh one, which replays from the last event and finishes the job <i>without re-running the planner or duplicating a single step</i>. Underneath sits plain BullMQ rather than Temporal, a deliberate bet: event sourcing bought most of the durability at a fraction of the operational cost. The deferral is documented with a revival trigger, not forgotten.</p>
+
+<details>
+<summary>Under the hood: how a run survives its own death</summary>
+<div class="inner">
+<div class="mermaid-frame"><div class="frame-bar"><span class="dot"></span><span class="t">system diagram</span><span class="live">rendered live</span></div>
+<div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Q as BullMQ queue<br/>agent-exec (tenant lanes)
+    participant W1 as worker #1
+    participant DB as run_events<br/>(Postgres, append-only)
+    participant T as sandboxed tool
+    participant W2 as worker #2
+
+    Q ->> W1: claim job (idempotency key)
+    W1 ->> DB: append PLAN
+    W1 ->> T: tool.call #1
+    T -->> W1: observation
+    W1 ->> DB: append TOOL_CALL + OBSERVATION
+    W1 -x W1: ✖ worker killed mid-run
+    Note over W1,DB: crash: nothing in memory survives,<br/>but every transition was already appended
+
+    Q ->> W2: same job redelivered<br/>(idempotency key dedupes)
+    W2 ->> DB: read event log
+    DB -->> W2: resume after last completed step
+    Note over W2: planner NOT re-invoked<br/>no duplicate tool side effects
+    W2 ->> T: tool.call #2 (next pending step)
+    T -->> W2: observation
+    W2 ->> DB: append OBSERVATION + DONE
+    W2 -->> Q: job complete
+
+    style W1 fill:#241014,stroke:#FF6B6B,color:#E8ECF4
+    style DB fill:#101A2C,stroke:#5CC8FF,color:#E8ECF4
+    style W2 fill:#0F1D16,stroke:#46E3C8,color:#E8ECF4
+</div>
+</div>
+<p>The subtle part is idempotency at every boundary: job IDs are colon-free so Redis cluster slots them safely, redelivered jobs dedupe on their idempotency key, and each tool call carries one too, because replay means some effects may have landed before the crash. Durability is mostly bookkeeping discipline, not exotic infrastructure.</p>
+</div>
+</details>
+
+<h3>Untrusted code meets a locked room</h3>
+<p>Tools execute inside an isolated VM with a serialized bridge only. No host handles cross the boundary. CPU-time caps kill infinite loops. Heap caps kill bombs. Module loading, network access, filesystem egress: blocked by construction, and asserted by a red-team suite I genuinely enjoyed writing. Every escape I could imagine, turned into a test that must fail.</p>
+
+<h3>Webhooks: physics vs promises</h3>
+<p>Delivery is at-least-once; that's physics and you don't fight physics. Observation is exactly-once: receivers dedupe by HMAC signature, timestamp replay protection, and event ID. The integration test delivers the same event three times and asserts it was processed once, with tampered deliveries rejected before recording anything. Failed deliveries land in a dead-letter queue with a replay CLI, so "temporarily down" never means "permanently lost."</p>
+
+<details>
+<summary>The quiet feature that saves agents from their own context windows</summary>
+<div class="inner">
+  <p>Context assembly packs system prompt, history, and retrieved chunks into a model's window with priority ordering and truncation markers, unit-tested against every registered model's context length. Unglamorous. Also the difference between an agent that degrades gracefully at the token ceiling and one that crashes at 128k.</p>
+</div>
+</details>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 6 ========== -->
+<h2 id="witness"><span class="chap">Chapter Six</span>The witness stand</h2>
+
+<p>Four services produce behavior. The fifth produces <i>evidence</i>. I think of the ops plane as the witness stand where the rest of the system explains itself, and it permanently changed how I ask questions about AI systems:</p>
+
+<table>
+  <tr><th>The question</th><th>What answers it now</th></tr>
+  <tr><td>"Why did it say that?"</td><td>One W3C trace ID reconstructs the full journey: gateway attempt, retrieval hits, sandbox executions, in Jaeger or raw ClickHouse.</td></tr>
+  <tr><td>"Which prompt is live, and what changed?"</td><td>Prompts are immutable semver artifacts with validated template variables and dev→staging→prod promotion. Published versions can't change. Only new versions can exist.</td></tr>
+  <tr><td>"Is the new prompt actually better?"</td><td>An eval engine scores prompt-version × model combinations against golden datasets, and a CLI gate blocks promotions on regression. Eval is a checkpoint, not a decoration.</td></tr>
+  <tr><td>"Should we roll it out to everyone?"</td><td>Deterministic sticky A/B splits between arms (prompt versions or model overrides), reported once per session key, summarized with 95% confidence intervals and win probabilities.</td></tr>
+</table>
+
+<p>The experiment engine carries my favorite design constraint in the whole project: the gateway resolves assignments locally from polled rules, so when the control plane goes down, requests degrade to "everyone gets control" rather than "nobody gets completions." Compare that to the security paths, sandbox escapes, forged webhooks, cross-tenant reads, which fail closed by design. <strong>Knowing which paths may fail open and which may not is half of reliability.</strong></p>
+
+<p>The stats are honest too: seeded Monte-Carlo win probabilities from wide posteriors, arms with no data can't win by default. Small-n experiments produce humble conclusions, on purpose.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 7 ========== -->
+<h2 id="glue"><span class="chap">Chapter Seven</span>Five repos, one handshake</h2>
+
+<p>The smallest package carries the most architectural weight. Types for requests, chunks, usage, errors, tenants. Zod schemas mirroring the environment contract so startup fails fast on misconfiguration. HMAC signing shared identically by webhooks and inter-service auth. The telemetry module every service instruments with. Protobuf definitions gating breaking changes behind major versions.</p>
+
+<p>Why does this matter? Because <strong>drift between services is a contracts problem before it's a deployment problem.</strong> Without the shared package, service A's "validation_failed" becomes service B's mystery 500. With it, breaking changes require a major version bump in public, with a changelog. It felt like overhead for about a week. Then it felt like gravity.</p>
+
+<pre><code>@axiom-ai/core
+├── types/       requests · chunks · usage · tenants · errors
+├── config/      Zod schemas (startup fails fast, loudly)
+├── crypto/      signPayload / verifySignature (one format everywhere)
+├── telemetry/   OTel SDK + Gen-AI span conventions   ← plot twist lives here
+└── proto/       axiom/v1 (the source of truth)</code></pre>
+
+<p>Some decisions I sweated over, recorded so future-me can judge present-me:</p>
+
+<table>
+  <tr><th>The fork</th><th>Where I landed, and the sentence that decided it</th></tr>
+  <tr><td>Rust or Node for the gateway?</td><td>Node. Shared ecosystem with the contracts beats theoretical throughput. Benchmark-before-rewrite keeps the door honest.</td></tr>
+  <tr><td>Temporal or BullMQ?</td><td>BullMQ plus event sourcing. Ninety percent of the durability, ten percent of the ops burden, documented revival trigger.</td></tr>
+  <tr><td>Qdrant or Redis for the similarity cache?</td><td>Started Redis. Switched to Qdrant mid-build: it already did per-tenant filtered search natively. Deleting a consistency-bug class beats defending an earlier choice.</td></tr>
+  <tr><td>Stripe now or later?</td><td>Test-mode only, GA deferred. Metering lands fully formed in ClickHouse either way. Zero external spend for v1, as a recorded constraint, not a hope.</td></tr>
+</table>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 7.5 TOPOLOGY ========== -->
+<h2 id="topology"><span class="chap">Chapter Seven and a Half</span>Lift the hood</h2>
+
+<p>The story so far has been deliberately narrative. This interlude is for the reader who now wants to see the machine: what runs where, what talks to what, and how one request actually moves through all of it.</p>
+
+<h3>Everything that runs, on one page</h3>
+
+<div class="mermaid-frame"><div class="frame-bar"><span class="dot"></span><span class="t">system diagram</span><span class="live">rendered live</span></div>
+<div class="mermaid">
+flowchart LR
+    APP["your app / curl / SDK"]
+
+    subgraph GW["axiom-gateway :3000"]
+        direction TB
+        AUTH["auth · rate limits<br/>input cache · experiments<br/>failover router"]
+    end
+
+    PROV["providers<br/>Groq · Mistral · Gemini · NIM<br/>(failover chain)"]
+    RAG["axiom-rag-pipeline :8000<br/>Python · FastAPI"]
+    AGENT["axiom-agent-runtime :5000<br/>BullMQ · isolated-vm · webhooks"]
+
+    CH[("ClickHouse<br/>metering rows")]
+    QD[("Qdrant<br/>vectors")]
+    RD[("Redis<br/>cache · queues")]
+    PG[("Postgres<br/>run events")]
+
+    OPS["axiom-ops-observability :4000<br/>traces · prompt registry · evals<br/>A/B stats · Grafana"]
+    OPG[("Postgres/Prisma<br/>prompts · datasets")]
+
+    APP --> GW
+    GW -->|"OpenAI-compatible"| PROV
+    GW -->|"retrieve"| RAG
+    GW -->|"dispatch"| AGENT
+    GW -->|"async batch"| CH
+
+    RAG --- QD
+    RAG --- RD
+    AGENT --- RD
+    AGENT --- PG
+
+    GW -.->|"W3C traceparent<br/>every hop"| OPS
+    AGENT -.-> OPS
+    CH --> OPS
+    OPS --- OPG
+
+    classDef service fill:#101A2C,stroke:#5CC8FF,color:#E8ECF4,stroke-width:1.5px
+    classDef store fill:#141B2B,stroke:#9AA4B8,color:#E8ECF4
+    classDef ext fill:#0F1D16,stroke:#46E3C8,color:#E8ECF4
+    classDef ops fill:#1A1608,stroke:#FFC46B,color:#E8ECF4
+    classDef app fill:#241032,stroke:#A48FFF,color:#E8ECF4
+    class GW,RAG,AGENT,OPS service
+    class CH,QD,RD,PG,OPG store
+    class PROV ext
+    class APP app
+</div>
+</div>
+<div class="diagram-cap">Five packages, four data stores, one trace context threaded through every hop</div>
+
+<p>A few deliberate choices hide in this picture. Every arrow that crosses a service boundary carries W3C <code>traceparent</code>, which is why a single trace ID can reconstruct an entire journey later. Every store has exactly one job: ClickHouse for immutable telemetry rows, Postgres for stateful artifacts (prompts, run events, experiment records), Qdrant for vectors, Redis for anything ephemeral. No store is doing two jobs; no service reaches past another to touch a store it doesn't own.</p>
+
+<h3>Anatomy of one request</h3>
+
+<div class="mermaid-frame"><div class="frame-bar"><span class="dot"></span><span class="t">system diagram</span><span class="live">rendered live</span></div>
+<div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant C as client
+    participant G as gateway
+    participant R as Redis
+    participant CH as ClickHouse
+    participant P as provider
+
+    C->>G: POST /chat/completions (Bearer key)
+    Note over G: t+1ms authenticate<br/>keyHash → tenant claims
+    G->>G: t+2ms experiment?<br/>bucket(salt, sessionKey)
+    G->>R: t+3ms sliding-window check
+    alt over limit
+        R -->> G: deny → 429 + retry-after
+    else allowed
+        G->>G: t+4ms cache lookup (tenant-scoped hash)
+        alt cache hit
+            G-->>C: serve cached completion + meter it
+        else miss
+            Note over G: t+5ms extract traceparent,<br/>open server span
+            G->>P: t+6ms route via circuit breaker
+            Note over P: 5xx? breaker records failure,<br/>next provider in chain
+            P-->>G: completion + reported usage (t+600ms)
+            G->>CH: meter row: tokens reconciled vs estimate
+            G-->>C: SSE stream or JSON (t+602ms)
+        end
+    end
+    Note over G,CH: async: spans flush to ops plane<br/>→ Jaeger-compatible queries
+
+    classDef client fill:#241032,stroke:#A48FFF,color:#E8ECF4
+    classDef gw fill:#101A2C,stroke:#5CC8FF,color:#E8ECF4
+    class C client
+    class G gw
+</div>
+</div>
+<div class="diagram-cap">Gateway overhead budget: under 15ms non-streaming, under 5ms TTFB streaming</div>
+
+<p>The whole proxy tax lives in the first few milliseconds of bookkeeping. Everything after routing is the upstream model's own latency, untouched.</p>
+
+<h3>Where the hard guarantees actually live</h3>
+
+<table>
+  <tr><th>Guarantee</th><th>Mechanism under the hood</th></tr>
+  <tr><td>Tenant isolation</td><td>Credentials → claims → mandatory filters applied at the data layer; callers supply intent, never scope</td></tr>
+  <tr><td>Sandbox containment</td><td>isolated-vm with CPU-time + heap limits, serialized bridge only, no host handles crossing the boundary</td></tr>
+  <tr><td>Run durability</td><td>Append-only event log per run in Postgres; replay resumes from last completed step with idempotent tool calls</td></tr>
+  <tr><td>Webhook integrity</td><td>HMAC-SHA256 signature + timestamp window + event-id dedupe; DLQ with signed replay CLI</td></tr>
+  <tr><td>Cost accountability</td><td>Per-request meter rows in ClickHouse, estimator vs provider-reported drift tracked as a first-class column</td></tr>
+  <tr><td>Trace correlation</td><td>Propagator registered once in the shared library; server span per request; byte-asserted by test at every hop</td></tr>
+</table>
+
+<details>
+<summary>Why five data stores instead of "just use Postgres for everything"?</summary>
+<div class="inner">
+  <p>Fair challenge. Postgres genuinely could store vectors, queues, and telemetry; people do. The split buys three things: each store's superpower where it matters (ClickHouse ingesting millions of immutable telemetry rows cheaply, Qdrant doing filtered vector search natively, Redis at microsecond queue latency), independent scaling and failure domains (a Redis restart never touches billing history), and honest operational simplicity per concern, since tuning Postgres for OLAP workloads while also serving transactional writes is its own specialty.</p>
+  <p>The tradeoff is real too: more moving parts at boot, hence the compose stack and the smoke check that verifies every health endpoint. For a small self-hosted install, starting with Postgres-only and adopting stores one at a time behind the same interfaces would be a defensible path, and the interfaces are drawn so that path stays open.</p>
+</div>
+</details>
+
+<p>That's the machine. Now back to the story, because the best part, the part where the machine fooled me, comes next.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 8 ========== -->
+<h2 id="empty"><span class="chap">Chapter Eight</span>The bug that left no trace</h2>
+
+<p>Every long build has one bug that humbles you. Mine arrived in the final week, wearing a green checkmark.</p>
+
+<p>The last open deliverable was correlation: prove one trace ID follows a request from client through gateway to provider. Traces were flowing. Spans were landing in ClickHouse. Dashboards rendered. Everything looked observably, verifiably fine.</p>
+
+<p>Then I wrote the proof test: capture the outbound request at a mock provider and assert it carries a valid W3C <code>traceparent</code> descended from the inbound one.</p>
+
+<pre><code>expect(outbound.traceparent).not.toBe("");
+// → received: ""</code></pre>
+
+<p>Empty. Not malformed. Not missing sometimes. <i>Empty.</i></p>
+
+<p>The root cause read like a riddle. OpenTelemetry ships a default propagator called <code>NoopTextMapPropagator</code>. Its job is to do nothing, gracefully. Registering a tracer provider, which I had done, does <strong>not</strong> register a propagator. Nobody tells you this. No warning fires. Every "inject" call I made was injecting context into a void, and the void accepted it politely.</p>
+
+<p>And there was a second layer to the embarrassment: even with a real propagator, my gateway injected from an empty ambient context. It never extracted the inbound headers in the first place. So even "fixed," traces would have started chains from scratch, severing the very correlation the whole exercise existed to create.</p>
+
+<div class="aside bad">
+  <span class="tag">The lesson under the lesson</span>
+  <p>Observability failures are unique: <strong>the system works perfectly except for the part that tells you how it works.</strong> Nothing errors. Nothing logs. Your traces are simply emptier than you believe, possibly forever. Conventional tests cannot catch them, because conventional tests don't assert on observability. Only a byte-level assertion on the contract itself does. Test the traceparent, not the dashboard.</p>
+</div>
+
+<p>The fix went in at both layers. The shared telemetry initializer now registers the W3C propagator explicitly, so every service inherits correct behavior by existing. The gateway extracts inbound context and opens a server span per request, so clients that send no tracing headers still get a valid chain. The test turned green and stayed in the suite as permanent evidence. The bug that left no trace now leaves a very specific one.</p>
+
+<p>Honorable mentions from the same campaign: a not-found handler shadowed by parameterized routes (caught by scaffold test), colons in job IDs breaking Redis cluster slotting (fixed, commented, unfixed-able again), and a stray local process squatting on port 4000 during verification, immortalized as an honest port deviation in the tracker rather than silently papered over.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 9 ========== -->
+<h2 id="what-i-learned"><span class="chap">Chapter Nine</span>What I'd tell you over coffee</h2>
+
+<p>Strip away the code, and here is what four months actually taught me.</p>
+
+<p><strong>Evidence is a culture, not a phase.</strong> The exit-criteria rule felt bureaucratic for exactly three days. Then it caught a failing assumption I would have shipped proudly. Definition-of-done written first, testable, arguing back: cheapest senior engineer available.</p>
+
+<p><strong>Adversarial design is cheaper than adversarial incidents.</strong> The security suites, sandbox escapes, tenancy attacks, webhook forgery, shipped cleanest of anything in the project. Not because I'm clever. Because they were hostile from the first commit instead of bolted on after the first scare.</p>
+
+<p><strong>Cost is a first-class requirement.</strong> Metering with reconciliation deltas reshaped design decisions far from billing. Cache-hit paths proven to avoid embedding calls. Prompt-cache discounts surfaced instead of silently absorbed. If you can't attribute spend per tenant per feature, you're not running a product, you're sponsoring one.</p>
+
+<p><strong>Prompts are artifacts, not strings.</strong> Immutable versions, validated variables, promotion gates. Once "which prompt produced this?" has a real answer, eval scores mean something, rollbacks become possible, and prompt changes stop being folklore.</p>
+
+<p><strong>Defer loudly.</strong> Temporal, Celery, Unstructured, Stripe GA: every cut is written down with the condition that revives it. "We'll revisit if X happens" is strategy. Silence is just debt with better branding.</p>
+
+<p><strong>And document the deviations.</strong> The port conflict, the swapped cache backend, the forward-looking metrics scrapes. Readers trust documentation that admits limits. I trust engineers who write them.</p>
+
+<h3>If you build products on AI (and don't want the code tour)</h3>
+<div class="aside">
+  <span class="tag">Ask these five questions about any AI system you own or buy</span>
+  <p>1. Which providers does it fall back to when one dies?<br>
+     2. Can it tell you what one customer interaction cost?<br>
+     3. Can it show you why a specific bad answer happened?<br>
+     4. What prevents two customers' data from mixing?<br>
+     5. Who approves a prompt change before users feel it?</p>
+  <p>Silence on any of these isn't a platform gap. It's uninsured risk, waiting to be priced.</p>
+</div>
+
+<h3>If you build AI systems yourself</h3>
+<div class="aside good">
+  <span class="tag">Steal the seams, then steal the gates</span>
+  <p><strong>Seams:</strong> provider adapters behind one interface; a vector-store interface making Qdrant-vs-Pinecone a config choice; a rules-polling experiment engine that degrades to no-op; event-sourced runs so durability doesn't require a workflow engine.<br><br>
+  <strong>Gates:</strong> recall@k in CI. Reconciliation deltas on usage. Escape suites that must fail closed. A traceparent assertion. None glamorous. Together: the difference between having features and being a system.</p>
+</div>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 10 ========== -->
+<h2 id="fine-print"><span class="chap">Chapter Ten</span>The part most posts skip</h2>
+
+<p>Credibility comes from what you admit, so here's the ledger.</p>
+
+<p><strong>Not load-proven at scale.</strong> Formal k6 profiles, 1k concurrent streams, webhook storms, are Phase 5. Today's performance claims come from targeted benchmarks with stated methodology, not sustained production traffic.</p>
+
+<p><strong>You operate it.</strong> This is self-hosted infrastructure. Single-node compose by default; retention, tuning, and pager duty are yours. Prometheus scrape targets are declared ahead of the services exposing metrics exporters, and the dashboards say so plainly.</p>
+
+<p><strong>Some plan features shipped as deviations.</strong> Background tasks replaced Celery workers. Native parsers replaced Unstructured. Eval scorers run in-process rather than as subprocesses. Each recorded with rationale. Deviation logs are how a project stays honest with its own roadmap.</p>
+
+<p><strong>And it's not done.</strong> Guardrails middleware, a full docs site, Helm charts, and v1.0 tags remain. That's not a disclaimer; it's the point. Infrastructure is never done. It just reaches the state where other people can safely stand on it.</p>
+
+<footer>
+  <span class="sig">End of transmission</span>
+  <p><strong>Axiom AI</strong> is Apache-2.0: five packages, 198 passing tests, eight ADRs, and one test file that will never let me forget the empty traceparent. The full evidence log, mapping every claim in this post to a named test, ships in the repository.</p>
+  <p style="margin-top:10px;">Part of Tanvir's agentic portfolio, alongside <a href="https://github.com/mailtotanvir/stratum">Stratum</a>, a local-first execution runtime where nothing executes without a human approval gate.</p>
+</footer>
+
+</article>
+</div>
+
+<script>
+  // mermaid diagrams: dark theme matching the page palette
+  const mermaidTheme = {
+    start: "loaded",
+    darkMode: true,
+    theme: "base",
+    themeVariables: {
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      fontSize: "13px",
+      primaryColor: "#101A2C",
+      primaryTextColor: "#E8ECF4",
+      primaryBorderColor: "#5CC8FF",
+      lineColor: "#9AA4B8",
+      secondaryColor: "#141B2B",
+      tertiaryColor: "#0A0E17",
+      noteBkgColor: "#1A1608",
+      noteTextColor: "#F5C56B",
+      noteBorderColor: "#FFC46B",
+      actorBkg: "#101A2C",
+      actorBorder: "#5CC8FF",
+      actorTextColor: "#E8ECF4",
+      signalColor: "#9AA4B8",
+      signalTextColor: "#E8ECF4",
+    },
+    flowchart: { curve: "basis", padding: 14 },
+    sequence: { actorMargin: 42, noteMargin: 10, mirrorActors: false },
+  };
+
+  function renderMermaid() {
+    if (!window.mermaid) return setTimeout(renderMermaid, 120);
+    window.mermaid.initialize(mermaidTheme);
+    window.mermaid.run({ querySelector: ".mermaid" });
+  }
+  renderMermaid();
+
+  // reading progress bar
+  const bar = document.getElementById('progress');
+  const doc = document.documentElement;
+  window.addEventListener('scroll', () => {
+    const total = doc.scrollHeight - window.innerHeight;
+    bar.style.width = (total > 0 ? (window.scrollY / total) * 100 : 0) + '%';
+  }, { passive: true });
+
+  // active chapter highlighting
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id));
+    });
+  }, { rootMargin: '-20% 0px -65% 0px' });
+  targets.forEach(t => spy.observe(t));
+</script>
+</body>
+</html>
