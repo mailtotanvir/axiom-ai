@@ -99,6 +99,46 @@ services:
       clickhouse:
         condition: service_healthy
 
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=3d
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/alerts:/etc/prometheus/rules:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      gateway:
+        condition: service_started
+      rag-pipeline:
+        condition: service_started
+      agent-runtime:
+        condition: service_started
+      ops-observability:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_SECURITY_ADMIN_USER: axiom
+      GF_SECURITY_ADMIN_PASSWORD: axiom
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3300:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+
   traefik:
     image: traefik:v3.5
     command:
@@ -200,3 +240,4 @@ volumes:
   pgdata:
   clickhouse_data:
   qdrant_storage:
+  grafana_data:

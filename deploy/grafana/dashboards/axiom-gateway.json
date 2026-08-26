@@ -1,0 +1,122 @@
+{
+  "uid": "axiom-gateway",
+  "title": "LLM Gateway: Latency & Token Spend",
+  "tags": [
+    "axiom-ai",
+    "o5"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "p50/p95/p99 latency (ms)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT timestamp AS time, tenant_id, quantile(0.5)(latency_ms) AS p50, quantile(0.95)(latency_ms) AS p95, quantile(0.99)(latency_ms) AS p99 FROM axiom.metering_usage_events WHERE $__timeFilter(timestamp) GROUP BY timestamp, tenant_id ORDER BY timestamp",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Token spend by tenant ($)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfHour(timestamp) AS time, tenant_id, sum(cost_usd) AS spend_usd FROM axiom.metering_usage_events WHERE $__timeFilter(timestamp) GROUP BY time, tenant_id ORDER BY time",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Tokens by model (prompt vs completion)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfHour(timestamp) AS time, model, sum(prompt_tokens) AS prompt_tokens, sum(completion_tokens) AS completion_tokens FROM axiom.metering_usage_events WHERE $__timeFilter(timestamp) GROUP BY time, model ORDER BY time",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Requests by provider",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfHour(timestamp) AS time, provider, count() AS requests FROM axiom.metering_usage_events WHERE $__timeFilter(timestamp) GROUP BY time, provider ORDER BY time",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    }
+  ]
+}

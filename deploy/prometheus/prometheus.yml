@@ -1,0 +1,33 @@
+# Prometheus configuration for local development (O5).
+#
+# Scrapes the four platform services and evaluates the alert packs in
+# deploy/alerts/. Services are expected to expose OpenMetrics text at
+# /metrics on their container ports.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["gateway:3000"]
+
+  - job_name: rag-pipeline
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["rag-pipeline:8000"]
+
+  - job_name: agent-runtime
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["agent-runtime:5000"]
+
+  - job_name: ops-observability
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["ops-observability:4000"]

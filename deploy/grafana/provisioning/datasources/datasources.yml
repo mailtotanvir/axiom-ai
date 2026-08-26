@@ -1,0 +1,39 @@
+# Grafana datasource provisioning (O5).
+apiVersion: 1
+
+datasources:
+  - name: Axiom ClickHouse
+    uid: axiom-clickhouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: http://clickhouse:8123
+    isDefault: true
+    jsonData:
+      protocol: http
+      port: 8123
+      server: clickhouse
+      username: axiom
+      defaultDatabase: axiom
+    secureJsonData:
+      password: axiom
+
+  - name: Prometheus
+    uid: axiom-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    jsonData:
+      httpMethod: POST
+
+  - name: Postgres
+    uid: axiom-postgres
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: axiom
+    database: axiom_metadata
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+    secureJsonData:
+      password: axiom

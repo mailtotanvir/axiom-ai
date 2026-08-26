@@ -1,0 +1,96 @@
+{
+  "uid": "axiom-evals",
+  "title": "Eval Results Overview",
+  "tags": [
+    "axiom-ai",
+    "o5"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pass rate by run",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT timestamp AS time, run_id, round(100 * avg(passed), 2) AS pass_rate FROM axiom.eval_results WHERE $__timeFilter(timestamp) GROUP BY timestamp, run_id ORDER BY timestamp",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Mean score by metric",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfHour(timestamp) AS time, metric, avg(score) AS mean_score FROM axiom.eval_results WHERE $__timeFilter(timestamp) GROUP BY time, metric ORDER BY time",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Run summary (per run)",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT run_id, tenant_id, dataset_name, dataset_version, prompt_name, prompt_version, model, round(avg(score), 3) AS mean_score, round(100 * avg(passed), 1) AS pass_pct, count() AS cases FROM axiom.eval_results WHERE $__timeFilter(timestamp) GROUP BY run_id, tenant_id, dataset_name, dataset_version, prompt_name, prompt_version, model",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    }
+  ]
+}

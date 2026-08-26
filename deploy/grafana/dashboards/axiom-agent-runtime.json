@@ -1,0 +1,122 @@
+{
+  "uid": "axiom-agent-runtime",
+  "title": "Agent Runtime: Queues & Sandbox",
+  "tags": [
+    "axiom-ai",
+    "o5"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Queue depth",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agent_runtime_queue_depth",
+          "legendFormat": "queue depth",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "axiom-prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "axiom-prometheus"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Sandbox rejection rate (5m)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agent_runtime_sandbox_rejections_total[5m])",
+          "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "axiom-prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "axiom-prometheus"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Queue depth growth (10m derivative)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "deriv(agent_runtime_queue_depth[10m]) * 600",
+          "legendFormat": "projected growth / 10m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "axiom-prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "axiom-prometheus"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Sandbox rejections by reason (1h increase)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(agent_runtime_sandbox_rejections_total[1h])",
+          "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "axiom-prometheus"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "axiom-prometheus"
+      }
+    }
+  ]
+}

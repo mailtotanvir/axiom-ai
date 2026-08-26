@@ -1,0 +1,79 @@
+# Example Prometheus alert pack for the Axiom AI platform (O5).
+#
+# Recording rules precompute the latency/error signals used by the Grafana
+# dashboards; alerting rules fire on p95 latency, error-rate spikes, agent
+# queue growth, and ClickHouse ingestion stalls.
+#
+# Metric names follow the OpenTelemetry Prometheus convention
+# (http.server.request.duration, queue depth gauges exported by
+# agent-runtime, and ClickHouse's own exporter metrics).
+
+groups:
+  - name: axiom-recording
+    interval: 30s
+    rules:
+      - record: axiom:http:p95_latency_ms
+        expr: |
+          histogram_quantile(0.95,
+            sum by (job, le) (rate(http_server_request_duration_seconds_bucket[5m]))
+          ) * 1000
+
+      - record: axiom:http:error_rate_5m
+        expr: |
+          sum by (job) (rate(http_server_requests_errors_total[5m]))
+          / clamp_min(sum by (job) (rate(http_server_requests_total[5m])), 1e-9)
+
+  - name: axiom-gateway-alerts
+    rules:
+      - alert: GatewayHighP95Latency
+        expr: axiom:http:p95_latency_ms{job="gateway"} > 2000
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway
+        annotations:
+          summary: "Gateway p95 latency above 2s"
+          description: >-
+            The LLM gateway has a 5m p95 latency of
+            {{ $value }} ms for at least 5 minutes.
+
+      - alert: ServiceErrorRateSpike
+        expr: axiom:http:error_rate_5m > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Error rate above 5% on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} is returning errors on more than 5% of
+            requests over the last 5 minutes.
+
+  - name: axiom-agent-runtime-alerts
+    rules:
+      - alert: AgentQueueDepthGrowth
+        expr: deriv(agent_runtime_queue_depth[10m]) * 600 > 50
+        for: 10m
+        labels:
+          severity: warning
+          service: agent-runtime
+        annotations:
+          summary: "Agent execution queue growing"
+          description: >-
+            agent-runtime queue depth is trending toward +50 items over
+            the next 10 minutes; consumers are falling behind producers.
+
+  - name: axiom-clickhouse-alerts
+    rules:
+      - alert: ClickHouseIngestionStall
+        expr: rate(axiom_clickhouse_rows_inserted_total[10m]) == 0 and on() (axiom_trace_events_expected or vector(1))
+        for: 15m
+        labels:
+          severity: critical
+          service: clickhouse
+        annotations:
+          summary: "ClickHouse ingestion stalled"
+          description: >-
+            No rows have been inserted into ClickHouse for 15 minutes while
+            the platform is serving traffic; trace/metering ingestion from
+            the OTel collector may be down.

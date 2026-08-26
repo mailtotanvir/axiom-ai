@@ -1,0 +1,96 @@
+{
+  "uid": "axiom-cache",
+  "title": "Cache Hit Rates",
+  "tags": [
+    "axiom-ai",
+    "o5"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Gateway input cache hit rate (%)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfFiveMinutes(timestamp) AS time, round(100 * avg(cache_hit), 2) AS cache_hit_pct FROM axiom.metering_usage_events WHERE $__timeFilter(timestamp) GROUP BY time ORDER BY time",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Provider cached input tokens read",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfHour(timestamp) AS time, model, sum(cache_read_tokens) AS cached_read, sum(cached_input_tokens) AS provider_cached FROM axiom.metering_usage_events WHERE $__timeFilter(timestamp) GROUP BY time, model ORDER BY time",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Cache hits by tenant",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfHour(timestamp) AS time, tenant_id, sum(cache_hit) AS hits, count() AS requests FROM axiom.metering_usage_events WHERE $__timeFilter(timestamp) GROUP BY time, tenant_id ORDER BY time",
+          "format": "table",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "axiom-clickhouse"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "axiom-clickhouse"
+      }
+    }
+  ]
+}
