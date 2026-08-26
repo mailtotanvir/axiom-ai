@@ -5,6 +5,8 @@
 
 export interface ClickHouseClient {
   query<T>(sql: string, queryParameters?: Record<string, string>): Promise<T[]>;
+  /** Bulk-inserts newline-delimited JSON rows with FORMAT JSONEachRow. */
+  insert(sql: string, jsonLines: string): Promise<void>;
   ping(): Promise<boolean>;
 }
 
@@ -66,6 +68,34 @@ export class ClickHouseHttp implements ClickHouseClient {
           .split("\n")
           .filter((line) => line.trim() !== "")
           .map((line) => JSON.parse(line) as T);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError ?? new Error("no clickhouse nodes configured");
+  }
+
+  async insert(sql: string, jsonLines: string): Promise<void> {
+    let lastError: unknown;
+    for (const node of this.nodes) {
+      try {
+        const url = new URL(`http://${node}`);
+        const headers: Record<string, string> = { "content-type": "text/plain" };
+        if (url.username !== "" || url.password !== "") {
+          headers.authorization = `Basic ${Buffer.from(
+            `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`,
+          ).toString("base64")}`;
+          url.username = "";
+          url.password = "";
+        }
+        url.search = `?query=${encodeURIComponent(sql)}`;
+        const response = await this.withTimeout(
+          this.fetchImpl(url.toString(), { method: "POST", body: jsonLines, headers }),
+        );
+        if (!response.ok) {
+          throw new ClickHouseHttpError(response.status, await response.text());
+        }
+        return;
       } catch (error) {
         lastError = error;
       }

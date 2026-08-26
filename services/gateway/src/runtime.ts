@@ -32,6 +32,7 @@ import {
   InputCache,
   RedisCacheStore,
 } from "./cache/inputCache.js";
+import { ExperimentEngine } from "./experiments/engine.js";
 
 import type { GatewayConfig } from "./config.js";
 
@@ -46,6 +47,8 @@ export interface GatewayRuntime {
   guardrails: GuardrailHook;
   inputCache: InputCache;
   anthropicAutoSystemCache: boolean;
+  /** A/B assignment engine; absent when no control plane is configured. */
+  experiments?: ExperimentEngine;
   redis?: RedisClient;
   close: () => Promise<void>;
 }
@@ -140,6 +143,15 @@ export async function buildRuntime(config: GatewayConfig): Promise<GatewayRuntim
 
   const guardrails: GuardrailHook = new PassThroughGuardrails();
 
+  const experiments =
+    config.OPS_CONTROL_PLANE_URL !== undefined
+      ? new ExperimentEngine({
+          controlPlaneUrl: config.OPS_CONTROL_PLANE_URL,
+          internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
+          cacheTtlMs: config.GATEWAY_EXPERIMENTS_CACHE_TTL_MS,
+        })
+      : undefined;
+
   return {
     adapters,
     registry,
@@ -151,6 +163,7 @@ export async function buildRuntime(config: GatewayConfig): Promise<GatewayRuntim
     guardrails,
     inputCache,
     anthropicAutoSystemCache: config.GATEWAY_ANTHROPIC_AUTO_SYSTEM_CACHE,
+    experiments,
     redis,
     close: async () => {
       await Promise.allSettled(sinks.map((sink) => sink.flush()));

@@ -1,4 +1,5 @@
--- Axiom AI ClickHouse schema (G6 metering; O1 traces land in Phase 4).
+-- Axiom AI ClickHouse schema (G6 metering; O1 traces via collector exporter;
+-- O3 eval results below).
 
 CREATE DATABASE IF NOT EXISTS axiom;
 
@@ -30,5 +31,29 @@ CREATE TABLE IF NOT EXISTS axiom.metering_usage_events
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(timestamp)
 ORDER BY (tenant_id, timestamp)
+TTL toDateTime(timestamp) + INTERVAL 13 MONTH
+SETTINGS index_granularity = 8192;
+
+-- Per-case metric rows for evaluation runs (O3). Column names are
+-- snake_case per ClickHouse convention; the sink maps camelCase fields.
+CREATE TABLE IF NOT EXISTS axiom.eval_results
+(
+    timestamp       DateTime64(3, 'UTC'),
+    run_id          String,
+    tenant_id       LowCardinality(String),
+    dataset_name    LowCardinality(String),
+    dataset_version UInt32,
+    prompt_name     LowCardinality(String),
+    prompt_version  LowCardinality(String),
+    model           LowCardinality(String),
+    case_id         String,
+    metric          LowCardinality(String),
+    score           Float64,
+    passed          UInt8,
+    detail          String
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (run_id, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 13 MONTH
 SETTINGS index_granularity = 8192;

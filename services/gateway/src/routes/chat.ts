@@ -29,6 +29,7 @@ import {
 
 import type { GatewayRuntime } from "../runtime.js";
 import { resolveTenant } from "../auth/middleware.js";
+import type { Assignment } from "../experiments/engine.js";
 import { SseTap } from "../providers/sse.js";
 import { extractUsageFromSseData } from "../providers/sseUsage.js";
 import type { CacheEnvelope } from "../cache/inputCache.js";
@@ -101,6 +102,28 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
     const wire = parsed.data;
     const unified: ChatCompletionRequest = toUnified(wire, request.id);
 
+    // ------------------------ A/B experimentation ------------------------
+    // Resolves before the allowlist check so arm model overrides pass
+    // through the same tenant policy as client-chosen models. Sticky keys:
+    // explicit session header first, else the caller's API-key hash.
+    const sessionHeader = request.headers["x-axiom-session-id"];
+    const stickyKey =
+      typeof sessionHeader === "string" && sessionHeader.length >= 1 && sessionHeader.length <= 256
+        ? `session:${sessionHeader}`
+        : `key:${record.keyHash}`;
+    const experiment =
+      (await runtime.experiments?.resolve(tenant.tenantId, unified.model, stickyKey)) ??
+      undefined;
+    if (experiment?.modelOverride !== undefined) {
+      unified.model = experiment.modelOverride;
+    }
+    applyExperimentTemplate(unified, experiment, experimentVarsOf(request));
+    if (experiment !== undefined) {
+      emitAssignmentSpan(app, request.id, tenant.tenantId, experiment);
+      void reply.header("x-axiom-experiment", experiment.experimentName);
+      void reply.header("x-axiom-experiment-arm", experiment.arm);
+    }
+
     if (
       tenant.allowedModels.length > 0 &&
       !tenant.allowedModels.includes(unified.model)
@@ -148,9 +171,24 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
       }
     });
 
-    // W3C trace-context propagation to the upstream.
+    // W3C trace-context propagation to the upstream. Extract the caller's
+    // context first, then ensure a gateway server span exists so every
+    // proxied call carries a valid traceparent even when the client sent
+    // no tracing headers (O6).
     const traceHeaders: Record<string, string> = {};
-    otel.propagation.inject(otel.context.active(), traceHeaders);
+    const inboundContext = otel.propagation.extract(
+      otel.context.active(),
+      request.headers,
+    );
+    const serverSpan = app.telemetry.tracer.startSpan("gateway.chat", {}, inboundContext);
+    otel.propagation.inject(
+      otel.trace.setSpan(inboundContext, serverSpan),
+      traceHeaders,
+    );
+    reply.then(
+      () => serverSpan.end(),
+      () => serverSpan.end(),
+    );
 
     /* -------------------- Cache lookup (both modes) -------------------- */
     if (cacheKey !== null) {
@@ -172,6 +210,7 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
         traceHeaders,
         cacheKey,
         requestId: request.id,
+        experiment,
       });
       return;
     }
@@ -187,6 +226,7 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
           traceHeaders,
           tenant,
           requestId: request.id,
+          experiment,
         }),
     );
 
@@ -246,6 +286,79 @@ export function registerChatRoute(app: FastifyInstance, runtime: GatewayRuntime)
 
 /* -------------------------------- helpers -------------------------------- */
 
+/**
+ * Applies an arm's prompt template as (or over) the system message,
+ * substituting {{vars}} from the request's experiment-vars header
+ * leniently — unknown variables stay untouched.
+ */
+function applyExperimentTemplate(
+  request: ChatCompletionRequest,
+  assignment: Assignment | undefined,
+  vars: Record<string, unknown>,
+): void {
+  if (assignment?.template === undefined) {
+    return;
+  }
+  const rendered = assignment.template.replace(
+    /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g,
+    (whole: string, name: string) => {
+      if (!(name in vars)) {
+        return whole;
+      }
+      const value = vars[name];
+      return typeof value === "string" ? value : JSON.stringify(value);
+    },
+  );
+  const systemIndex = request.messages.findIndex((message) => message.role === "system");
+  if (systemIndex >= 0) {
+    request.messages[systemIndex] = { ...request.messages[systemIndex]!, content: rendered };
+  } else {
+    request.messages.unshift({ role: "system", content: rendered });
+  }
+}
+
+/** Optional per-request template variables: x-axiom-experiment-vars JSON. */
+function experimentVarsOf(request: FastifyRequest): Record<string, unknown> {
+  const raw = request.headers["x-axiom-experiment-vars"];
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > 8_192) {
+    return {};
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed)
+    ) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Malformed headers degrade to an empty var set.
+  }
+  return {};
+}
+
+/**
+ * O4: assignments surface in traces both as a dedicated span (visible even
+ * on cache hits) and on the upstream LLM span via FailoverDeps.experiment.
+ */
+function emitAssignmentSpan(
+  app: FastifyInstance,
+  requestId: string,
+  tenantId: string,
+  assignment: Assignment,
+): void {
+  const span = app.telemetry.tracer.startSpan("gateway.ab.assignment", {
+    attributes: {
+      [axiomAttr.requestId]: requestId,
+      [axiomAttr.tenantId]: tenantId,
+      [axiomAttr.experimentId]: assignment.experimentId,
+      [axiomAttr.experimentVariant]: assignment.arm,
+    },
+  });
+  span.end();
+}
+
 function resolveCandidates(runtime: GatewayRuntime, request: ChatCompletionRequest) {
   const catalogEntry = runtime.registry.get(request.model);
   const candidates = runtime.router.resolve(request.model, catalogEntry?.provider);
@@ -297,6 +410,7 @@ interface FailoverDeps {
   candidates: ProviderAdapter[];
   clientAbort: AbortController;
   traceHeaders: Record<string, string>;
+  experiment?: Assignment;
   tenant?: TenantContext;
   requestId?: string;
 }
@@ -333,6 +447,12 @@ async function attemptProviders<T>(
       {
         [llmAttr.system]: adapter.id,
         [llmAttr.requestModel]: deps.effectiveRequest.model,
+        ...(deps.experiment !== undefined
+          ? {
+              [axiomAttr.experimentId]: deps.experiment.experimentId,
+              [axiomAttr.experimentVariant]: deps.experiment.arm,
+            }
+          : {}),
         ...(deps.tenant !== undefined
           ? { [axiomAttr.tenantId]: deps.tenant.tenantId, [axiomAttr.projectId]: deps.tenant.projectId }
           : {}),

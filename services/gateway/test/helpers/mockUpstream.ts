@@ -14,6 +14,7 @@ export interface MockProviderOptions {
 
 interface StoredRequest {
   body: Record<string, unknown>;
+  headers: Record<string, string | string[] | undefined>;
 }
 
 export class MockUpstream {
@@ -60,7 +61,7 @@ export class MockUpstream {
     rawBody: string,
   ): Promise<void> {
     const body = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : {};
-    this.requests.push({ body });
+    this.requests.push({ body, headers: { ...req.headers } });
 
     if (this.latencyMs > 0) {
       await sleep(this.latencyMs);

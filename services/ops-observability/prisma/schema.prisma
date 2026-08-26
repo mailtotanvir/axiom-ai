@@ -57,3 +57,121 @@ model PromptPromotion {
   @@unique([versionId, environment])
   @@map("prompt_promotions")
 }
+
+// ---------------------------------------------------------------------------
+// Eval engine (O3): versioned, tenant-scoped golden datasets.
+// ---------------------------------------------------------------------------
+
+model GoldenDataset {
+  id        String       @id @default(uuid())
+  tenantId  String       @map("tenant_id")
+  name      String
+  version   Int
+  createdAt DateTime     @default(now()) @map("created_at")
+  cases     GoldenCase[]
+
+  @@unique([tenantId, name, version])
+  @@map("golden_datasets")
+}
+
+model GoldenCase {
+  id         String        @id @default(uuid())
+  datasetId  String        @map("dataset_id")
+  dataset    GoldenDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  /// Stable case key within the dataset (e.g. "case-001").
+  externalId String        @map("external_id")
+  /// Template variables fed to the prompt under test.
+  vars       Json
+  /// Expectations consumed by metrics (outputText, contains, pattern, ...).
+  expected   Json
+
+  @@unique([datasetId, externalId])
+  @@map("golden_cases")
+}
+
+/// Durable eval-run summaries; per-case metric rows live in ClickHouse.
+model EvalRun {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  datasetName    String   @map("dataset_name")
+  datasetVersion Int      @map("dataset_version")
+  promptName     String   @map("prompt_name")
+  promptVersion  String   @map("prompt_version")
+  model          String
+  status         String   @default("running")
+  overallScore   Float?   @map("overall_score")
+  caseCount      Int      @default(0) @map("case_count")
+  errorCount     Int      @default(0) @map("error_count")
+  startedAt      DateTime @default(now()) @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+
+  @@index([tenantId, datasetName, startedAt])
+  @@map("eval_runs")
+}
+
+// ---------------------------------------------------------------------------
+// A/B experimentation (O4): tenant-scoped traffic splits over prompt
+// versions/models. Assignments are high-volume append rows keyed by a hash
+// of the sticky bucketing key (raw ids never stored).
+// ---------------------------------------------------------------------------
+
+model Experiment {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  name            String
+  /// draft | running | completed | archived
+  status          String   @default("draft")
+  /// Optional model targeting: only matching requests participate.
+  targetingModels Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  arms ExperimentArm[]
+  assignments ExperimentAssignment[]
+  outcomes ExperimentOutcome[]
+
+  @@unique([tenantId, name])
+  @@map("experiments")
+}
+
+model ExperimentArm {
+  id           String     @id @default(uuid())
+  experimentId String     @map("experiment_id")
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  name         String
+  /// Integer traffic percentage; arms of an experiment sum to 100.
+  weight       Int
+  model        String?
+  promptName   String?    @map("prompt_name")
+  /// Pinned version; null resolves to the latest promoted published one.
+  promptSemver String?    @map("prompt_semver")
+
+  @@unique([experimentId, name])
+  @@map("experiment_arms")
+}
+
+model ExperimentAssignment {
+  id           String     @id @default(uuid())
+  experimentId String     @map("experiment_id")
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  armName      String     @map("arm_name")
+  /// sha256 hex of the gateway's sticky bucketing key.
+  keyHash      String     @map("key_hash")
+  requestId    String?    @map("request_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([experimentId, keyHash])
+  @@index([experimentId, createdAt])
+  @@map("experiment_assignments")
+}
+
+model ExperimentOutcome {
+  id           String     @id @default(uuid())
+  experimentId String     @map("experiment_id")
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  keyHash      String     @map("key_hash")
+  value        Float
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([experimentId, keyHash])
+  @@map("experiment_outcomes")
+}

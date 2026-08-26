@@ -123,6 +123,10 @@ export const gatewayConfigSchema = baseConfigSchema
       }),
     /** Anthropic-only: mark the trailing system block with cache_control. */
     GATEWAY_ANTHROPIC_AUTO_SYSTEM_CACHE: z.coerce.boolean().default(false),
+    /** Ops control plane serving A/B rules; experiments off when unset. */
+    OPS_CONTROL_PLANE_URL: z.string().url().optional(),
+    /** How long gateway-cached experiment rules stay fresh. */
+    GATEWAY_EXPERIMENTS_CACHE_TTL_MS: z.coerce.number().int().min(1_000).max(600_000).default(15_000),
   });
 
 export type GatewayRouting = NonNullable<z.infer<typeof gatewayConfigSchema>["GATEWAY_ROUTING"]>;

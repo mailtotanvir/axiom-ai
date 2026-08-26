@@ -20,12 +20,25 @@ import { registerPromptRoutes } from "./prompts/routes.js";
 import { PrismaPromptRegistry } from "./prompts/store.js";
 import { InMemoryPromptRegistry } from "./prompts/memoryStore.js";
 import type { PromptRegistryStore } from "./prompts/types.js";
+import { registerEvalRoutes } from "./evals/routes.js";
+import { ClickHouseEvalResultsSink, EvalRunner, HttpGatewayChatClient } from "./evals/runner.js";
+import type { EvalRunner as EvalRunnerType } from "./evals/runner.js";
+import { PrismaEvalStore } from "./evals/store.js";
+import type { EvalStore } from "./evals/store.js";
+import { InMemoryEvalStore } from "./evals/stores.js";
+import { registerExperimentRoutes } from "./experiments/routes.js";
+import { PrismaExperimentStore } from "./experiments/store.js";
+import type { ExperimentStore } from "./experiments/store.js";
+import { InMemoryExperimentStore } from "./experiments/stores.js";
 
 export interface OpsStores {
   clickhouse?: ClickHouseClient;
   traceStore?: TraceStore;
   retention?: RetentionStore;
   registry?: PromptRegistryStore;
+  evalStore?: EvalStore;
+  evalRunner?: EvalRunnerType;
+  experimentStore?: ExperimentStore;
 }
 
 /** Applies the prompt-registry DDL idempotently (see prisma/ddl.sql). */
@@ -69,6 +82,35 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
     (config.POSTGRES_DB_URI !== undefined
       ? new PrismaPromptRegistry(config.POSTGRES_DB_URI)
       : new InMemoryPromptRegistry());
+
+  const evalStore =
+    stores.evalStore ??
+    (config.POSTGRES_DB_URI !== undefined
+      ? new PrismaEvalStore(config.POSTGRES_DB_URI)
+      : new InMemoryEvalStore());
+
+  const experimentStore =
+    stores.experimentStore ??
+    (config.POSTGRES_DB_URI !== undefined
+      ? new PrismaExperimentStore(config.POSTGRES_DB_URI)
+      : new InMemoryExperimentStore());
+
+  const gatewayChat = new HttpGatewayChatClient(
+    config.GATEWAY_INTERNAL_URL,
+    // Evals authenticate as an internal caller of the gateway.
+    process.env.AGENT_RUNTIME_LLM_API_KEY ?? "",
+  );
+  const evalRunner =
+    stores.evalRunner ??
+    new EvalRunner({
+      evalStore,
+      registry,
+      resultsSink:
+        clickhouse !== undefined
+          ? new ClickHouseEvalResultsSink(clickhouse)
+          : undefined,
+      gateway: gatewayChat,
+    });
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof AxiomError) {
@@ -137,6 +179,19 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
   });
 
   registerPromptRoutes(app, {
+    registry,
+    internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
+  });
+
+  registerEvalRoutes(app, {
+    store: evalStore,
+    runner: evalRunner,
+    registry,
+    internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
+  });
+
+  registerExperimentRoutes(app, {
+    store: experimentStore,
     registry,
     internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
   });

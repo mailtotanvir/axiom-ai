@@ -5,13 +5,17 @@
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
+  "bin": {
+    "axiom-eval-gate": "./dist/evals/gateCli.js"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval-gate": "tsx src/evals/gateCli.ts"
   },
   "dependencies": {
     "@axiom-ai/core": "^0.2.0",

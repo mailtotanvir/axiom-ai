@@ -8,6 +8,7 @@ import { type Span, SpanStatusCode, trace, type Tracer, context, type ContextAPI
 
 export type { Tracer };
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { Resource } from "@opentelemetry/resources";
 import {
   BasicTracerProvider,
@@ -50,7 +51,13 @@ export function initTelemetry(options: TelemetryOptions): TelemetryHandle {
     provider.addSpanProcessor(new BatchSpanProcessor(exporter));
   }
 
-  provider.register();
+  provider.register({
+    // W3C trace-context propagation is required for O6 cross-service
+    // correlation: without a registered propagator the OTel API defaults to
+    // NoopTextMapPropagator and traceparent headers are never injected or
+    // extracted.
+    propagator: new W3CTraceContextPropagator(),
+  });
   const tracer = trace.getTracer(options.serviceName, options.serviceVersion);
 
   const handle: TelemetryHandle = {
