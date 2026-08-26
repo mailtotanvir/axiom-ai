@@ -14,7 +14,7 @@
 Axiom AI is five cooperating packages that together form a complete LLM platform:
 a multi-provider gateway with metering and failover, a tenant-isolated RAG
 knowledge fabric, a sandboxed agent compute engine, and an observability control
-plane with evals, prompt versioning, and A/B experimentation — all bound by one
+plane with evals, prompt versioning, and A/B experimentation, all bound by one
 shared contract library.
 
 ```text
@@ -91,19 +91,19 @@ Design principles that survive contact with production:
   live in one published package. Protos are the source of truth; breaking
   changes are gated behind major versions.
 - **Structural tenancy.** Tenant scope comes from verified credentials and is
-  enforced by the data layer itself — a crafted filter cannot cross tenants
+  enforced by the data layer itself: a crafted filter cannot cross tenants
   because the filter is not the caller's to supply.
 - **Fail-open only where safe.** The proxy path degrades gracefully when the
   control plane is down (experiments resolve to "no experiment"); the security
   path fails closed (sandbox escapes, forged webhooks, cross-tenant reads).
 - **Everything observable from day one.** Tracing was not bolted on at the
-  end — the trace-context bug story in our [test evidence log](docs/testing/TEST-EVIDENCE.md)
+  end; the trace-context bug story in our [test evidence log](docs/testing/TEST-EVIDENCE.md)
   shows why.
 
 ## Quickstart
 
 Prerequisites: Node 20+, Python 3.11+, Docker with Compose v2, and at least one
-provider key — Groq, Mistral, Google Gemini, SiliconFlow, or NVIDIA NIM all work
+provider key. Groq, Mistral, Google Gemini, SiliconFlow, and NVIDIA NIM all work
 via their OpenAI-compatible endpoints (OpenAI/Anthropic adapters included,
 key-gated).
 
@@ -156,20 +156,20 @@ Every request emits Gen-AI semantic-convention spans (prompt/completion tokens,
 model, cost, finish reason) into ClickHouse, queryable through a
 Jaeger-compatible API. The ops plane adds:
 
-- **Prompt registry** — prompts as immutable semver artifacts with
+- **Prompt registry**: prompts as immutable semver artifacts with
   dev→staging→prod promotion and diff views
-- **Eval engine** — golden datasets scored against any prompt-version × model
+- **Eval engine**: golden datasets scored against any prompt-version × model
   combination; a CI-callable CLI gates regressions before promotion
-- **A/B experiments** — deterministic sticky traffic splits between arms
+- **A/B experiments**: deterministic sticky traffic splits between arms
   (prompt versions or model overrides), reported once per key, summarized with
   95% confidence intervals and Bayesian win probabilities
-- **Dashboards & alerting** — provisioned Grafana boards for latency
+- **Dashboards & alerting**: provisioned Grafana boards for latency
   percentiles, token spend by tenant/model, cache hit rates, queue depth, and
   eval pass rates, plus a Prometheus alert pack
 
 ## Testing & Proof of Reality
 
-Claims are backed by suites, not vibes — the full evidence log lives in
+Claims are backed by suites, not vibes. The full evidence log lives in
 [docs/testing/TEST-EVIDENCE.md](docs/testing/TEST-EVIDENCE.md). Highlights:
 
 | Claim | Proof |
@@ -189,7 +189,7 @@ RUN_LIVE_CONTRACT_TESTS=1 npx vitest run --root services/gateway test/liveContra
 ## Status & Roadmap
 
 Phases 0–4 are complete (foundation, gateway MVP + caching, agent runtime, RAG
-pipeline, ops control plane) — see the live tracker with exit-criteria reviews
+pipeline, ops control plane); see the live tracker with exit-criteria reviews
 in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 - ✅ Shipped: provider failover, metering, tenant isolation, sandboxed agents, durable webhooks, tracing, evals, prompt registry, A/B experiments, dashboards
@@ -202,7 +202,7 @@ We welcome contributions of all sizes. Read [CONTRIBUTING.md](CONTRIBUTING.md),
 sign off your commits (DCO), and check the `good first issue` label. Security
 vulnerabilities follow [SECURITY.md](SECURITY.md); please do not open public
 issues for them. Architectural decisions are recorded as ADRs in
-[docs/adr](docs/adr) — propose significant changes via an RFC there first.
+[docs/adr](docs/adr). Propose significant changes via an RFC there first.
 
 ## License
 
