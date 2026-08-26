@@ -160,6 +160,34 @@ Redis-gated webhook integration tests via `TEST_WEBHOOKS_INTEGRATION=1`).
 - Hybrid search fuses dense candidates with BM25 via Reciprocal Rank Fusion
   at the service layer; a native Qdrant sparse index is the scale-out path.
 
+## Phase 4 — Ops & Observability (exit 2026-08-26)
+
+### Exit-criteria evidence
+
+| Criterion | Evidence |
+|-----------|----------|
+| One trace ID reconstructs the full request journey | `services/gateway/test/experiments.test.ts > O6 cross-service trace correlation`: inbound `traceparent` extracted, `gateway.chat` server span opened, outbound request to the mock upstream captured with a valid W3C traceparent sharing the inbound trace id and a fresh child span id. Testing exposed a real defect: `initTelemetry` never registered a propagator so OTel used NoopTextMapPropagator and no headers were ever injected — fixed in `packages/core-shared/src/telemetry.ts` (W3CTraceContextPropagator) plus chat-route extract/inject |
+| Eval run gates a prompt promotion in CI | `services/ops-observability/test/evalGateCli.test.ts` (4): gate CLI scores prompt-version × model against golden datasets, exits nonzero on regression; `evalApi.test.ts`, `evals.test.ts`, `evalStore.prisma.test.ts` cover dataset CRUD, run execution, metric scoring, and the Prisma store |
+| A/B split demonstrably shifts traffic with clean assignment logs | `services/gateway/test/experiments.test.ts` (11 total): 2000-key weight distribution within sane bounds of declared weights, sticky determinism per key, control-plane-down degrades to no experiment, stale rules served on refresh failure, model override + template substitution proven through the full chat route including `x-axiom-experiment*` headers; ops-side stats covered by win-probability/CI95 tests |
+
+### Suite breakdown
+
+- vitest totals: core 22, gateway 64 (10 live-gated skips), agent-runtime 23,
+  ops-observability 46 (11 Prisma-gated skips), pytest 43.
+- New this phase: gateway `experiments.test.ts` (11); ops `evalApi`,
+  `evals`, `evalGateCli`, `evalStore.prisma` suites.
+- Lint/typecheck clean across all four TS workspaces; compose config validated.
+
+### Scope notes / deviations from plan
+
+- DeepEval/Ragas metrics are implemented as in-process scorers behind the
+  eval-runner interface rather than subprocess runners for v1.
+- Services do not yet expose `/metrics`; the Prometheus scrape targets in
+  `deploy/prometheus/prometheus.yml` are forward-looking until Phase 5 adds
+  metrics exporters. Dashboards otherwise query the real ClickHouse schemas.
+- Grafana provisioning, dashboards, and alert packs live under
+  `deploy/grafana/` and `deploy/alerts/` (commit `ed41ceb`).
+
 ## Reproducing
 
 ```bash

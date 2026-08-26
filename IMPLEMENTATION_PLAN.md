@@ -320,8 +320,32 @@ Updated at the end of every completed phase.
 | 1.1 — Gateway input caching | **Complete** (2026-08-24) | n/a (addendum) | Exact-match tenant-scoped cache + provider-native prompt-cache metering for OpenAI/Anthropic families; commit `59e559b` |
 | 3 — Agent Runtime | **Complete** (2026-08-24) | All — see below | A1–A5 delivered (Temporal deferred per D2); commits `2aa9473`, `bc8e9b2`, `367f0a1`, `4497fce` |
 | 2 — RAG Pipeline | **Complete** (2026-08-25) | All, with recorded deviations | R1–R6 delivered; Celery workers, Unstructured, Redis vector search, and native Qdrant sparse indexes deferred as scale-outs |
-| 4 — Ops & Observability | **In progress** (started 2026-08-25) | Pending | O1–O6 implementation underway |
+| 4 — Ops & Observability | **Complete** (2026-08-26) | All — see below | O1–O6 delivered (DeepEval/Ragas runners deferred as scale-outs); commits `6344404`, `e7a7b3d`, `a02a3a8`, `ed41ceb` |
 | 5 — Hardening & Launch | Not started | — | — |
+
+### Phase 4 exit-criteria review (2026-08-26)
+
+| Criterion | Result |
+|-----------|--------|
+| One trace ID reconstructs the full request journey | Done — W3C trace-context propagation verified E2E: gateway extracts inbound context, opens a `gateway.chat` server span per request, and every proxied upstream call carries a valid traceparent. This testing exposed and fixed a real bug: OTel silently used NoopTextMapPropagator before registration |
+| Eval run gates a prompt promotion in CI | Done — regression-gate CLI (`evalGateCli`) scores a prompt version against a golden dataset and exits nonzero on regression; suite covers API, runner, store, and CLI paths |
+| A/B split demonstrably shifts traffic with clean assignment logs | Done — deterministic sha256 bucketing spreads keys within sane bounds of declared weights; sticky per key; assignments reported once per (experiment, key); arm model overrides and prompt templates proven on the chat route |
+
+**Deliverables:** O1 trace ingestion + Jaeger-compatible query API (`6344404`);
+O2 prompt registry with Prisma semver promotion (`e7a7b3d`); O3 eval engine
+(golden datasets, metric scoring, ClickHouse results sink) and O4 experiments
+(traffic splits, win-probability stats with 95% CIs, gateway rules endpoint)
+(`a02a3a8`); O5 Grafana dashboards + Prometheus alert packs wired into compose,
+and O6 correlation proof via the new gateway test suite (`ed41ceb`).
+
+**Accepted deviations:** DeepEval/Ragas run as in-process metric scorers rather
+than subprocess runners for v1; Prometheus scrape targets are forward-looking
+until services expose `/metrics` endpoints (Phase 5 hardening adds exporters);
+dashboards query the actual ClickHouse schemas in `deploy/clickhouse/init.sql`.
+
+**Test totals:** 155 vitest passing across core/gateway/agent-runtime/ops (13
+Prisma/live-gated skips), 43 pytest; lint and typecheck clean.
+
 
 ### Phase 2 exit-criteria review (2026-08-25)
 
