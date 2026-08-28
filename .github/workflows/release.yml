@@ -1,61 +1,124 @@
 name: Release
 
+# Milestone 5.6: on a v* tag, build multi-arch images, push to GHCR,
+# and publish @axiom-ai/core to npm.
+
 on:
   push:
-    tags: ["v*.*.*"]
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "packages/core-shared/**"
+      - "deploy/docker/**"
 
 permissions:
   contents: write
   packages: write
-  id-token: write
 
 jobs:
-  publish-images:
-    name: Publish ${{ matrix.service }} image (GHCR)
+  verify:
+    name: Full test suite gate
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build -w @axiom-ai/core
+      - run: npm test -w @axiom-ai/core
+      - run: npm test -w @axiom-ai/gateway
+      - run: npm test -w @axiom-ai/agent-runtime
+      - run: npm test -w @axiom-ai/ops-observability
+
+  images:
+    name: GHCR multi-arch image (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       fail-fast: false
       matrix:
         include:
-          - service: gateway
-            workspace: "@axiom-ai/gateway"
-            dir: gateway
-            entry: services/gateway/dist/index.js
-          - service: rag-pipeline
-            dir: rag-pipeline
-          - service: agent-runtime
-            workspace: "@axiom-ai/agent-runtime"
-            dir: agent-runtime
-            entry: services/agent-runtime/dist/index.js
-          - service: ops-observability
-            workspace: "@axiom-ai/ops-observability"
-            dir: ops-observability
-            entry: services/ops-observability/dist/index.js
+          - image: axiom-gateway
+            dockerfile: deploy/docker/service.Dockerfile
+            build_args: '--build-arg SERVICE_WORKSPACE=@axiom-ai/gateway --build-arg SERVICE_DIR=gateway --build-arg SERVICE_ENTRY=services/gateway/dist/index.js'
+            context: .
+          - image: axiom-agent-runtime
+            dockerfile: deploy/docker/service.Dockerfile
+            build_args: '--build-arg SERVICE_WORKSPACE=@axiom-ai/agent-runtime --build-arg SERVICE_DIR=agent-runtime --build-arg SERVICE_ENTRY=services/agent-runtime/dist/index.js'
+            context: .
+          - image: axiom-ops-observability
+            dockerfile: deploy/docker/service.Dockerfile
+            build_args: '--build-arg SERVICE_WORKSPACE=@axiom-ai/ops-observability --build-arg SERVICE_DIR=ops-observability --build-arg SERVICE_ENTRY=services/ops-observability/dist/index.js'
+            context: .
+          - image: axiom-rag-pipeline
+            dockerfile: Dockerfile
+            build_args: ""
+            context: services/rag-pipeline
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@v5
+        id: meta
         with:
-          images: ghcr.io/${{ github.repository_owner }}/axiom-${{ matrix.service }}
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
       - uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.service == 'rag-pipeline' && 'services/rag-pipeline' || '.' }}
-          file: ${{ matrix.service == 'rag-pipeline' && 'services/rag-pipeline/Dockerfile' || 'deploy/docker/service.Dockerfile' }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build_args }}
+          platforms: linux/amd64,linux/arm64
           push: true
-          provenance: true
-          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            SERVICE_WORKSPACE=${{ matrix.workspace }}
-            SERVICE_DIR=${{ matrix.dir }}
-            SERVICE_ENTRY=${{ matrix.entry }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+
+  npm-core:
+    name: Publish @axiom-ai/core to npm
+    runs-on: ubuntu-latest
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build -w @axiom-ai/core
+      - name: Verify version matches tag
+        run: |
+          PKG_VERSION="v$(node -p "require('./packages/core-shared/package.json').version")"
+          if [ "$PKG_VERSION" != "${GITHUB_REF_NAME}" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package version $PKG_VERSION"
+            exit 1
+          fi
+      - run: npm publish --access public -w @axiom-ai/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  github-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: [images, npm-core]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

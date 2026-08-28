@@ -1,6 +1,6 @@
 {
   "name": "@axiom-ai/core",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Shared contracts for Axiom AI: canonical types, configuration schemas, crypto signing, error taxonomy, and Protobuf definitions.",
   "license": "Apache-2.0",
   "type": "module",
@@ -39,11 +39,17 @@
     "vitest": "^3.0.5"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/axiom-ai/axiom",
-    "directory": "packages/core-shared"
-  }
+    "url": "git+https://github.com/mailtotanvir/axiom-core-shared.git"
+  },
+  "keywords": [
+    "llm",
+    "gateway",
+    "rag",
+    "ai",
+    "infrastructure"
+  ]
 }

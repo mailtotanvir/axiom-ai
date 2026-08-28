@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 5: The Hard Part Was Proving It Was Safe</title>
+<style>
+  :root {
+    /* surface scale: near-black with a cool cast (encyclopedia token system) */
+    --bg: #04070A;
+    --surface-1: #060C11;
+    --surface-2: #0A141B;
+    --surface-3: #10202B;
+    --card: rgba(233,244,241,0.03);
+    --line: rgba(159,182,187,0.14);
+    /* ink scale */
+    --text: #E9F4F1;
+    --dim: #9FB6BB;
+    --faint: #5E767C;
+    /* signal hues: each hierarchy level owns exactly one hue */
+    --blue: #5CC8FF;      /* gateway / thread hue */
+    --green: #46E3C8;     /* live / execution */
+    --amber: #FFC46B;     /* ops / control */
+    --violet: #A48FFF;    /* agent / block hue */
+    --pink: #FF7FA5;      /* memory / data-at-rest */
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    --sans: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    --display: 'Space Grotesk', var(--sans);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:32px; }
+  body {
+    background:
+      radial-gradient(ellipse 90% 55% at 50% -12%, rgba(92,200,255,0.09), transparent),
+      radial-gradient(ellipse 50% 40% at 100% 30%, rgba(164,143,255,0.05), transparent),
+      var(--bg);
+    color: var(--text); font-family: var(--sans);
+    line-height: 1.8; font-size: 17.5px;
+  }
+
+  /* reading progress */
+  #progress {
+    position: fixed; top:0; left:0; height:3px; width:0%;
+    background: linear-gradient(90deg, var(--green), var(--blue), var(--violet));
+    box-shadow: 0 0 12px rgba(92,200,255,.55);
+    z-index: 100; transition: width .08s linear;
+  }
+
+  .layout {
+    max-width: 1240px; margin: 0 auto;
+    display: grid; grid-template-columns: 250px minmax(0, 760px) 60px;
+    gap: 48px; padding: 0 24px;
+  }
+  @media (max-width: 1080px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    nav.toc { display: none; }
+  }
+
+  /* ---------- sidebar TOC ---------- */
+  nav.toc { padding-top: 120px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; scrollbar-width: thin; }
+  .toc-label { font-family: var(--mono); font-size: 9.5px; letter-spacing: .3em; color: var(--faint); text-transform: uppercase; margin-bottom: 16px; display:flex; align-items:center; gap:8px; }
+  .toc-label::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 6px rgba(70,227,200,.8); animation:pulse 2.4s ease-in-out infinite; }
+  nav.toc ol { list-style: none; counter-reset: toc; display: grid; border-left: 1px solid var(--line); }
+  nav.toc li { counter-increment: toc; }
+  nav.toc li a {
+    display: flex; align-items: baseline; gap: 10px; padding: 8px 16px; margin-left: -1px;
+    border-left: 2px solid transparent; font-size: 13px; color: var(--dim);
+    text-decoration: none; transition: all .18s; line-height: 1.4;
+  }
+  nav.toc li a::before {
+    content: "0" counter(toc); font-family: var(--mono); font-size: 9.5px;
+    color: var(--faint); transition: color .18s;
+  }
+  nav.toc li a:hover { color: var(--text); border-left-color: rgba(92,200,255,.4); transform: translateX(2px); }
+  nav.toc li a:hover::before { color: var(--blue); }
+  nav.toc li a.active { color: #fff; border-left-color: var(--blue); background: linear-gradient(90deg, rgba(92,200,255,.08), transparent); }
+  nav.toc li a.active::before { color: var(--green); }
+
+  article { padding-top: 96px; padding-bottom: 140px; min-width: 0; }
+
+  /* ---------- hero ---------- */
+  .kicker {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .kicker::before { content: ""; width: 28px; height: 1px; background: var(--green); }
+  h1 {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(40px, 6.5vw, 68px);
+    line-height: 1.05; letter-spacing: -0.025em;
+  }
+  h1 em { font-style: italic; color: var(--green); }
+  .standfirst { font-size: 20px; color: var(--dim); margin-top: 30px; max-width: 660px; line-height: 1.7; }
+  .meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 34px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--dim); }
+  .meta span { border: 1px solid var(--line); border-radius: 999px; padding: 7px 16px; background: rgba(233,244,241,0.02); }
+  .meta span::before { content: "●"; font-size: 7px; vertical-align: 2px; margin-right: 8px; color: var(--green); }
+  .meta span:nth-child(2)::before { color: var(--blue); }
+  .meta span:nth-child(3)::before { color: var(--amber); }
+
+  h2 {
+    font-family: var(--display); font-size: clamp(26px, 3vw, 32px); letter-spacing: -.015em;
+    font-weight: 700; margin: 96px 0 10px; scroll-margin-top: 40px; line-height: 1.2;
+  }
+  h2::before { content: ""; display:block; width: 44px; height: 2px; background: var(--line); position: relative; margin-bottom: 22px; }
+  h2::after { content: ""; display:block; width: 16px; height: 2px; background: var(--green); margin: -2px 0 0; transition: width .35s ease; }
+  h2:hover::after { width: 44px; }
+  h2 .chap {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .28em;
+    color: var(--faint); text-transform: uppercase; margin-bottom: 14px; font-weight: 400;
+  }
+  h2 .chap::before { content: "▸"; font-size: 9px; }
+  h3 { font-family: var(--display); font-size: 18.5px; margin: 36px 0 8px; letter-spacing: -.005em; }
+
+  /* section index numbers, encyclopedia style */
+  h2 { counter-increment: chapter; }
+  h2 .chap::after { content: "CH · " counter(chapter); margin-left: auto; color: var(--faint); opacity: .7; }
+  body { counter-reset: chapter; }
+  p { margin: 17px 0; }
+  .lead-in { font-family: var(--display); color: var(--text); }
+  .dim { color: var(--dim); }
+  a { color: var(--blue); text-decoration: none; } a:hover { text-decoration: underline; }
+  strong { font-weight: 650; color: #fff; }
+
+  blockquote {
+    margin: 38px 0; padding: 30px 34px; border-radius: 16px;
+    background: linear-gradient(135deg, rgba(92,200,255,.06), rgba(164,143,255,.03)), var(--surface-1);
+    border: 1px solid rgba(92,200,255,.22);
+    font-family: var(--display); font-size: clamp(19px, 2.2vw, 23px); line-height: 1.55;
+    position: relative; overflow: hidden;
+  }
+  blockquote::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, var(--blue), var(--violet));
+  }
+
+  pre { background: var(--surface-1); border:1px solid var(--line); border-radius:12px; padding:20px 22px; overflow-x:auto; margin:20px 0; font-family:var(--mono); font-size:13px; line-height:1.7; color:#B9D2DC; }
+  code { font-family:var(--mono); font-size:.86em; background: rgba(92,200,255,.09); border: 1px solid rgba(92,200,255,.14); padding:2px 7px; border-radius:5px; color:#8ED4FF; }
+  pre code { background:none; padding:0; color:inherit; }
+
+  table { width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; background: var(--surface-1); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th { font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.18em; color:var(--faint); text-align:left; padding:13px 16px; border-bottom:1px solid var(--line); background: rgba(233,244,241,.02); }
+  td { padding:13px 16px; border-bottom:1px solid rgba(159,182,187,.08); vertical-align:top; color:var(--dim); }
+  tr:last-child td { border-bottom:none; }
+  td:first-child { white-space:nowrap; font-weight:600; color:var(--text); }
+  tbody tr, table tr { transition: background .15s; }
+  table tr:hover td { background: rgba(92,200,255,.03); }
+
+  .aside {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px 28px; margin: 30px 0; position: relative; overflow: hidden;
+  }
+  .aside::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--faint); }
+  .aside.warn { background: linear-gradient(90deg, rgba(255,196,107,.06), transparent 55%), var(--surface-1); }
+  .aside.warn::before { background: var(--amber); }
+  .aside.good { background: linear-gradient(90deg, rgba(70,227,200,.06), transparent 55%), var(--surface-1); }
+  .aside.good::before { background: var(--green); }
+  .aside.bad  { background: linear-gradient(90deg, rgba(255,127,165,.06), transparent 55%), var(--surface-1); }
+  .aside.bad::before { background: #FF7FA5; }
+  .aside .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .26em; text-transform: uppercase;
+    display:inline-block; margin-bottom: 12px; padding: 4px 12px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--dim); background: rgba(233,244,241,.03);
+  }
+  .aside.warn .tag{color:var(--amber); border-color:rgba(255,196,107,.3)}
+  .aside.good .tag{color:var(--green); border-color:rgba(70,227,200,.3)}
+  .aside.bad .tag{color:#FF7FA5; border-color:rgba(255,127,165,.3)}
+  .aside p { margin: 8px 0; font-size: 15.5px; color: var(--dim); }
+  .aside p strong { color: var(--text); }
+
+  /* mermaid: framed instruments with a mono header strip */
+  .mermaid-frame {
+    background: var(--surface-1); border:1px solid var(--line); border-radius:14px;
+    margin:26px 0; overflow:hidden;
+  }
+  .mermaid-frame .frame-bar {
+    display:flex; align-items:center; gap:10px;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--faint); padding:11px 18px; border-bottom:1px solid var(--line);
+    background: rgba(233,244,241,.02);
+  }
+  .frame-bar .dot { width:6px; height:6px; border-radius:50%; background: var(--green); box-shadow: 0 0 8px rgba(70,227,200,.7); animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .frame-bar .live { margin-left:auto; color: var(--green); }
+  .mermaid {
+    background:#04070A; padding:26px 18px; overflow-x:auto;
+    display:flex; justify-content:center;
+  }
+  .mermaid svg { max-width:100%; height:auto; }
+
+  /* interactive deep-dive toggles */
+  details {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    margin: 20px 0; overflow: hidden;
+  }
+  summary {
+    cursor: pointer; list-style: none; padding: 17px 24px;
+    font-family: var(--mono); font-size: 13.5px; color: var(--blue);
+    display: flex; align-items: center; gap: 10px; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "+"; font-size: 17px; transition: transform .2s; }
+  details[open] summary::before { transform: rotate(45deg); }
+  details[open] summary { border-bottom: 1px solid var(--line); }
+  details .inner { padding: 8px 24px 20px; font-size: 15.5px; color: var(--dim); }
+  details .inner p { margin: 10px 0; }
+  details .inner strong { color: var(--text); }
+
+  /* ---------- redaction lab: live secret scrubber ---------- */
+  .lab {
+    background: var(--surface-1); border:1px solid var(--line); border-radius:14px;
+    margin:26px 0; overflow:hidden;
+  }
+  .lab .lab-bar {
+    display:flex; align-items:center; gap:10px;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--faint); padding:11px 18px; border-bottom:1px solid var(--line);
+    background: rgba(233,244,241,.02);
+  }
+  .lab .lab-bar .dot { width:6px; height:6px; border-radius:50%; background: var(--green); box-shadow:0 0 8px rgba(70,227,200,.7); animation:pulse 2.4s ease-in-out infinite; }
+  .lab .lab-bar .live { margin-left:auto; color:var(--green); }
+  .lab .lab-body { padding: 22px; }
+  .lab textarea {
+    width:100%; min-height:110px; resize:vertical;
+    background: var(--bg); color: var(--text);
+    border:1px solid var(--line); border-radius:10px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    padding: 14px 16px; outline: none; transition: border-color .2s;
+  }
+  .lab textarea:focus { border-color: rgba(92,200,255,.45); }
+  .lab .lab-row { display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  .lab .btn {
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color: var(--bg); background: var(--green); border:none; border-radius:8px;
+    padding: 9px 18px; cursor:pointer; transition: filter .15s;
+  }
+  .lab .btn:hover { filter: brightness(1.12); }
+  .lab .btn.ghost { background: transparent; color: var(--dim); border:1px solid var(--line); }
+  .lab .btn.ghost:hover { color: var(--text); }
+  .lab .hint { font-family:var(--mono); font-size:11px; color:var(--faint); }
+  .lab output {
+    display:block; margin-top:16px; padding:14px 16px;
+    background: var(--bg); border:1px dashed rgba(70,227,200,.35); border-radius:10px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.7; color:#B9D2DC;
+    white-space: pre-wrap; word-break: break-all; min-height: 56px;
+  }
+  .lab output .redacted {
+    color:#FF7FA5; background: rgba(255,127,165,.1);
+    border:1px solid rgba(255,127,165,.3); border-radius:4px; padding:0 5px;
+    animation: stamp .3s ease;
+  }
+  @keyframes stamp { from { transform: scale(1.25); opacity:0; } to { transform: scale(1); opacity:1; } }
+
+  /* ---------- chaos board: clickable failure scenarios ---------- */
+  .chaos { display:grid; gap:14px; margin:26px 0; }
+  .chaos-scenario {
+    background: var(--surface-1); border:1px solid var(--line); border-radius:14px;
+    padding: 20px 24px; cursor:pointer; transition: border-color .2s, transform .15s;
+  }
+  .chaos-scenario:hover { border-color: rgba(92,200,255,.4); transform: translateX(3px); }
+  .chaos-scenario .head { display:flex; align-items:center; gap:12px; font-family: var(--display); font-weight:650; }
+  .chaos-scenario .head .glyph { font-size:18px; }
+  .chaos-scenario .head .arrow { margin-left:auto; color:var(--faint); transition: transform .25s; font-family: var(--mono); }
+  .chaos-scenario.open .head .arrow { transform: rotate(90deg); color: var(--blue); }
+  .chaos-scenario .trace { display:none; margin-top:14px; }
+  .chaos-scenario.open .trace { display:block; animation: slideIn .3s ease; }
+  @keyframes slideIn { from { opacity:0; transform: translateY(-6px);} to { opacity:1; transform:none; } }
+  .chaos-log {
+    font-family: var(--mono); font-size: 12px; line-height: 1.9;
+    background: var(--bg); border:1px solid var(--line); border-radius:10px; padding: 14px 16px;
+  }
+  .chaos-log .t { color: var(--faint); }
+  .chaos-log .ok { color: var(--green); }
+  .chaos-log .degrade { color: var(--amber); }
+  .chaos-log .kill { color: #FF7FA5; }
+  .chaos-verdict {
+    display:none; margin-top:12px; padding: 12px 16px; border-radius:10px;
+    font-size: 14.5px; color: var(--dim);
+    background: linear-gradient(90deg, rgba(70,227,200,.06), transparent 55%), var(--surface-1);
+    border:1px solid rgba(70,227,200,.25);
+  }
+  .chaos-scenario.open .chaos-verdict { display:block; }
+
+  /* ---------- billing ledger: idempotency demo ---------- */
+  .ledger { display:flex; gap:14px; align-items:center; margin:26px 0; flex-wrap:wrap; }
+  .ledger .card {
+    flex:1; min-width: 180px; background: var(--surface-1); border:1px solid var(--line);
+    border-radius:14px; padding:18px 20px; text-align:center; position:relative; overflow:hidden;
+  }
+  .ledger .card .n {
+    font-family: var(--display); font-size: 34px; font-weight:700;
+    color: var(--text); transition: color .3s;
+  }
+  .ledger .card .l { font-family:var(--mono); font-size:9.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--faint); margin-top:6px; }
+  .ledger .card .n.flash { animation: countFlash .5s ease; }
+  @keyframes countFlash { 0%{color:var(--green); transform:scale(1.15);} 100%{color:var(--text); transform:none;} }
+  .ledger .arrow { color: var(--faint); font-size: 22px; }
+  .ledger .controls { width:100%; display:flex; gap:10px; align-items:center; }
+  .ledger .note { width:100%; font-family:var(--mono); font-size:12px; color:var(--amber); min-height:20px; }
+
+  /* ---------- pipeline: animated monorepo -> five repos ---------- */
+  .extract-demo { margin: 26px 0; }
+  .extract-demo .mono-block {
+    background: var(--surface-1); border:1px solid var(--line); border-radius:14px;
+    padding: 26px 22px; overflow:hidden;
+  }
+  .extract-demo .lane {
+    display:flex; gap:18px; align-items:center; justify-content:center; flex-wrap:wrap;
+  }
+  .extract-demo .node {
+    font-family:var(--mono); font-size:12px; padding: 12px 16px; border-radius:10px;
+    border:1px solid rgba(92,200,255,.35); background: rgba(92,200,255,.06); color:#8ED4FF;
+    transition: all .3s;
+  }
+  .extract-demo .node.repos {
+    display:grid; gap:6px; border-color: var(--line); background: var(--bg);
+  }
+  .extract-demo .node.repos span {
+    opacity:0; transform: translateX(-8px); display:block;
+    color: var(--dim); border:1px solid var(--line); border-radius:6px; padding: 5px 10px;
+    transition: all .35s ease;
+  }
+  .extract-demo .node.repos span.on { opacity:1; transform:none; }
+  .extract-demo .node.repos span:nth-child(1).on { color: var(--blue); border-color: rgba(92,200,255,.4); }
+  .extract-demo .node.repos span:nth-child(2).on { color: var(--green); border-color: rgba(70,227,200,.4); }
+  .extract-demo .node.repos span:nth-child(3).on { color: var(--violet); border-color: rgba(164,143,255,.4); }
+  .extract-demo .node.repos span:nth-child(4).on { color: var(--amber); border-color: rgba(255,196,107,.4); }
+  .extract-demo .node.repos span:nth-child(5).on { color: var(--pink); border-color: rgba(255,127,165,.4); }
+  .extract-demo .beam {
+    width: 70px; height: 2px; background: var(--line); position:relative; overflow:visible;
+  }
+  .extract-demo .beam::after {
+    content:""; position:absolute; top:-2px; left:0; width: 10px; height:6px; border-radius:3px;
+    background: var(--green); box-shadow: 0 0 8px rgba(70,227,200,.8);
+    animation: beamRun 1.4s linear infinite; opacity:0;
+  }
+  .extract-demo.running .beam::after { opacity:1; }
+  @keyframes beamRun { from { left:-10px; } to { left: 100%; } }
+  .extract-demo .play {
+    display:block; margin: 18px auto 0;
+    font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color: var(--bg); background: var(--blue); border:none; border-radius:8px;
+    padding: 9px 20px; cursor:pointer; transition: filter .15s;
+  }
+  .extract-demo .play:hover { filter: brightness(1.12); }
+
+  .chapter-end { text-align:center; margin: 80px 0 0; color: var(--faint); font-family: var(--mono); font-size: 11px; letter-spacing: .5em; }
+
+  footer {
+    margin-top: 100px; padding: 36px 30px; border: 1px solid var(--line);
+    border-radius: 16px; background: var(--surface-1); color: var(--dim); font-size: 14.5px;
+  }
+  footer p:first-child strong { color: var(--text); font-family: var(--display); letter-spacing: .01em; }
+  footer .sig { font-family: var(--mono); font-size: 10px; letter-spacing: .28em; text-transform: uppercase; color: var(--faint); display:block; margin-bottom: 14px; }
+  footer .sig::before { content:"●"; color: var(--green); font-size: 7px; vertical-align: 2px; margin-right: 10px; animation:pulse 2.4s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<div id="progress"></div>
+
+<div class="layout">
+
+<!-- ================= SIDEBAR ================= -->
+<nav class="toc" aria-label="Chapters">
+  <div class="toc-label">The story so far</div>
+  <ol>
+    <li><a href="#demo-trap">The demo trap</a></li>
+    <li><a href="#secrets">The log that could have cost me everything</a></li>
+    <li><a href="#threat">Writing my own attack plan</a></li>
+    <li><a href="#chaos">Breaking my own platform on purpose</a></li>
+    <li><a href="#billing">The bug that would have double-billed everyone</a></li>
+    <li><a href="#packaging">Five repos, one tag</a></li>
+    <li><a href="#lessons">What I'd tell you over coffee</a></li>
+    <li><a href="#fine-print">The part most posts skip</a></li>
+  </ol>
+</nav>
+
+<!-- ================= ARTICLE ================= -->
+<article>
+
+<div class="kicker">A build story &nbsp;·&nbsp; Axiom AI &nbsp;·&nbsp; Phase 5</div>
+<div style="font-family:var(--mono); font-size:11px; color:var(--faint); letter-spacing:.12em; margin-bottom:18px;">
+  <span style="color:var(--green);">● SYSTEM LIVE</span>&nbsp;&nbsp;
+  <span>240 TESTS</span>&nbsp;&nbsp;
+  <span>4 SERVICES</span>&nbsp;&nbsp;
+  <span>1 THREAT MODEL</span>&nbsp;&nbsp;
+  <span>0 SECRETS LEAKED</span>
+</div>
+<h1>Phase 4 shipped the platform. Phase 5 asked: <em>can you prove it's safe?</em></h1>
+
+<p class="standfirst">The first post in this series ended with a platform that worked. This one starts with the question that kept me up after publishing it: working for whom? A gateway that works but logs your users' API keys in plaintext is not infrastructure. It's an incident report waiting for a date. Phase 5 was five milestones of proving my own platform would not hurt anyone, and it changed how I think about what "done" means.</p>
+
+<div class="meta">
+  <span><b>Reading time</b> ~16 min</span>
+  <span><b>Interactive</b> try the redaction lab yourself</span>
+  <span><b>Proof</b> 240 tests, STRIDE docs, chaos scripts</span>
+</div>
+
+<!-- ========== CH 1 ========== -->
+<h2 id="demo-trap"><span class="chap">Chapter One</span>The demo trap</h2>
+
+<p>Here is the confession up front: when Phase 4 ended, I hit publish on a build log that implied my platform was production-shaped. It was not. It was demo-shaped. The difference hit me when I asked one question about my own gateway: <span class="lead-in">where do the API keys go when things fail?</span></p>
+
+<p>Think about what happens when an upstream provider rejects a request. The HTTP client throws. The error message travels up through layers of handling. Somewhere, someone logs it. Now ask: what does an upstream provider put in an error message when your <code>Authorization</code> header is malformed? Sometimes, the header itself. My logs were one bad provider day away from collecting every credential that flowed through them, in plaintext, in stdout, where nothing scrubs anything.</p>
+
+<p>That question turned into Phase 5. Not "add features." <span class="lead-in">Prove the platform cannot leak, cannot be abused, cannot double-bill, and survives its dependencies dying.</span> Five milestones, in order: observability completion and guardrails, security hardening, chaos testing, billing, and launch packaging.</p>
+
+<div class="aside good">
+  <span class="tag">What shipped in Phase 5</span>
+  <p><strong>5.1</strong> Prometheus <code>/metrics</code> on all four services + PII guardrails &nbsp;·&nbsp; <strong>5.2</strong> secret scrubbing, CodeQL, gitleaks, Trivy, STRIDE threat models &nbsp;·&nbsp; <strong>5.3</strong> k6 load profiles + chaos suite &nbsp;·&nbsp; <strong>5.4</strong> Stripe test-mode billing &nbsp;·&nbsp; <strong>5.5</strong> docs site + Helm chart &nbsp;·&nbsp; <strong>5.6</strong> multi-repo extraction and release pipeline.</p>
+</div>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 2 ========== -->
+<h2 id="secrets"><span class="chap">Chapter Two</span>The log that could have cost me everything</h2>
+
+<p>The fix for the secret-leak problem is one module: <code>secrets.ts</code> in <code>@axiom-ai/core</code>. It is the smallest file in the platform and the one I would defend hardest in a design review. The idea: redaction happens at the last possible moment, in the logger itself, so that no amount of carelessness upstream can put a credential on disk.</p>
+
+<p>Three layers, one engine:</p>
+
+<table>
+  <thead><tr><th>Layer</th><th>Catches</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>Named keys</td><td>Anything whose field name smells like a credential</td><td><code>authorization</code>, <code>x-api-key</code>, <code>x-axiom-signature</code>, <code>cookie</code></td></tr>
+    <tr><td>Named headers</td><td>Serialized header objects, redacted verbatim</td><td>every sensitive header in a request dump</td></tr>
+    <tr><td>Value patterns</td><td>Credential-shaped text hiding in innocent fields</td><td><code>sk-...</code>, <code>gsk_...</code>, <code>Bearer ...</code>, <code>AKIA...</code>, PEM key blocks</td></tr>
+  </tbody>
+</table>
+
+<p>The third layer is the one that earns its keep. An error message like <code>"unauthorized for key gsk_abc123..."</code> has no field name to trip the first layer. The value pattern catches it anyway, because a Groq key looks like a Groq key no matter which field you stuff it into. Sixteen tests in CI assert this. Try it yourself, this runs the same logic in your browser:</p>
+
+<!-- INTERACTIVE: redaction lab -->
+<div class="lab">
+  <div class="lab-bar"><span class="dot"></span><span class="t">redaction lab</span><span class="live">runs locally, nothing leaves your browser</span></div>
+  <div class="lab-body">
+    <textarea id="lab-in" spellcheck="false">error: upstream rejected request for tenant t-1
+authorization: Bearer sk-proj-live-9f8e7d6c5b4a3210
+debug: retrying with fallback key gsk_qwertyuiop1234567890
+context: {"x-axiom-signature": "sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}</textarea>
+    <div class="lab-row">
+      <button class="btn" id="lab-run">Scrub</button>
+      <button class="btn ghost" id="lab-reset">Reset</button>
+      <span class="hint">paste your own log lines and watch them get redacted</span>
+    </div>
+    <output id="lab-out">press Scrub to run the same pattern engine the platform logs through</output>
+  </div>
+</div>
+
+<p>The engineering rule that makes this trustworthy: <span class="lead-in">redaction is not a feature, it is a default.</span> There is no opt-in flag. The logger scrubs everything, always, and the tests fail the build if a new credential shape escapes. My only regret is that I did not write this module in Phase 0. Every week it did not exist was a week the platform could silently hurt someone.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 3 ========== -->
+<h2 id="threat"><span class="chap">Chapter Three</span>Writing my own attack plan</h2>
+
+<p>A threat model sounds like enterprise paperwork until you actually write one, and then it becomes the fastest architecture review you have ever done. I used STRIDE: six categories of bad thing, applied to every trust boundary in the platform. The exercise is humbling because the format forces a verdict per row: <strong>mitigated</strong>, with a named control, or <strong>accepted</strong>, with a stated reason. "I think it's probably fine" is not a verdict the table accepts.</p>
+
+<div class="mermaid-frame"><div class="frame-bar"><span class="dot"></span><span class="t">trust boundaries</span><span class="live">rendered live</span></div>
+<div class="mermaid">
+flowchart LR
+    C["Internet client"] -->|"TB1 · TLS + JWT"| T["Traefik ingress"]
+    T -->|"TB2 · internal network"| G["Gateway :3000"]
+    T --> R["RAG :8000"]
+    T --> A["Agent Runtime :5000"]
+    T --> O["Ops Plane :4000"]
+    G -->|"TB3 · signed egress"| P["LLM providers"]
+    A --> WH["Webhook sinks"]
+    G --> CH[("ClickHouse")]
+    R --> Q[("Qdrant")]
+    A --> PG[("PostgreSQL")]
+    O --> CH
+    O --> PG
+    style C fill:#10202B,stroke:#5CC8FF,color:#E9F4F1
+    style T fill:#10202B,stroke:#46E3C8,color:#E9F4F1
+    style G fill:#0A141B,stroke:#5CC8FF,color:#8ED4FF
+    style R fill:#0A141B,stroke:#46E3C8,color:#46E3C8
+    style A fill:#0A141B,stroke:#A48FFF,color:#A48FFF
+    style O fill:#0A141B,stroke:#FFC46B,color:#FFC46B
+    style CH fill:#1A0E14,stroke:#FF7FA5,color:#FF7FA5
+    style Q fill:#1A0E14,stroke:#FF7FA5,color:#FF7FA5
+    style PG fill:#1A0E14,stroke:#FF7FA5,color:#FF7FA5
+    style P fill:#0A0E17,stroke:#5E767C,color:#9FB6BB
+    style WH fill:#0A0E17,stroke:#5E767C,color:#9FB6BB
+</div></div>
+
+<p>Three findings surprised me, and all three are now documented rather than fixed, because "fixed" was not the right response:</p>
+
+<p><strong>JWT revocation is not real-time.</strong> A compromised tenant token lives until expiry. Fixing this means introducing a token introspection service, a new failure mode, new latency. For v1.0, I wrote it down as accepted, with the mitigation that tokens are short-lived. That sentence in a threat model is worth more than a half-built revocation endpoint.</p>
+
+<p><strong>Provider prompt caches are external.</strong> The input-caching feature sends prompt bodies to provider-managed caches. For a tenant with hypersensitive data, that is a data residency question I cannot answer from inside my platform. The mitigation is a config flag to disable native caching. The honest answer is in the document, not in my conscience.</p>
+
+<p><strong>Grafana is internal-network-only, and that is a feature I might remove by "helpfully" exposing it.</strong> The threat model row now stands guard: any exposure requires an SSO proxy first. Future-me wants to expose it for a demo. Documented-me has a table row that says no.</p>
+
+<div class="aside">
+  <span class="tag">The method</span>
+  <p>One table per service, six rows per asset set, every row a verdict. <strong>Files:</strong> <code>docs/security/THREAT-MODEL.md</code> plus one deep dive each for gateway, RAG, agent runtime, and ops plane. The residual-risk list is the most valuable section, because it is the part that changes someone's deployment decision.</p>
+</div>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 4 ========== -->
+<h2 id="chaos"><span class="chap">Chapter Four</span>Breaking my own platform on purpose</h2>
+
+<p>Load testing tells you how fast your platform is. Chaos testing tells you whether it is honest when things go wrong. The distinction matters because the failure modes are opposite: load failures are loud, chaos failures are silent. A restart of Redis does not produce an error page. It produces <em>whatever your code does when a cache returns nothing</em>, which might be "serves traffic fine" or might be "every request 500s and the pager melts."</p>
+
+<p>I wrote <code>scripts/chaos.sh</code> to find out which one I had. Three scenarios, each one a dependency being murdered and resurrected while the gateway is probed:</p>
+
+<!-- INTERACTIVE: chaos board -->
+<div class="chaos" id="chaos-board">
+  <div class="chaos-scenario" data-i="0">
+    <div class="head"><span class="glyph">🧨</span> kill Redis mid-traffic <span class="arrow">▸</span></div>
+    <div class="trace">
+      <div class="chaos-log">
+        <div><span class="t">$ docker compose restart redis</span></div>
+        <div><span class="t">00:00.2</span> <span class="kill">redis: restarting, caches evicted</span></div>
+        <div><span class="t">00:00.8</span> <span class="degrade">gateway: rate limiter degraded to fail-open, serving</span></div>
+        <div><span class="t">00:01.1</span> <span class="ok">GET /health → 200</span></div>
+        <div><span class="t">00:01.4</span> <span class="ok">GET /health → 200</span></div>
+        <div><span class="t">00:06.0</span> <span class="ok">redis: recovered, cache warming</span></div>
+      </div>
+      <div class="chaos-verdict">The verdict I wanted: availability beats cache consistency. A cold cache is a cost problem; a down gateway is a trust problem. Rate limiting fails open during the restart window and snaps back after.</div>
+    </div>
+  </div>
+  <div class="chaos-scenario" data-i="1">
+    <div class="head"><span class="glyph">🧨</span> kill ClickHouse, watch the metering path <span class="arrow">▸</span></div>
+    <div class="trace">
+      <div class="chaos-log">
+        <div><span class="t">$ docker compose stop clickhouse</span></div>
+        <div><span class="t">00:00.3</span> <span class="kill">clickhouse: connection refused</span></div>
+        <div><span class="t">00:00.6</span> <span class="degrade">gateway: metering buffer degrades open, traffic flows</span></div>
+        <div><span class="t">00:01.0</span> <span class="ok">GET /health → 200</span></div>
+        <div><span class="t">00:01.3</span> <span class="ok">GET /health → 200</span></div>
+        <div><span class="t">00:08.0</span> <span class="ok">clickhouse: back up, buffered rows flushed</span></div>
+      </div>
+      <div class="chaos-verdict">The design choice under test: metering must never sit on the request path. Losing a billing data point for a minute is a reconciliation problem. Blocking every user request to protect it is an outage.</div>
+    </div>
+  </div>
+  <div class="chaos-scenario" data-i="2">
+    <div class="head"><span class="glyph">🧨</span> fail the primary provider, watch the circuit breaker <span class="arrow">▸</span></div>
+    <div class="trace">
+      <div class="chaos-log">
+        <div><span class="t">$ POST /v1/chat/completions {primary provider}</span></div>
+        <div><span class="t">00:00.2</span> <span class="kill">upstream: 500, breaker opens</span></div>
+        <div><span class="t">00:00.4</span> <span class="degrade">failover: routing to next provider in chain</span></div>
+        <div><span class="t">00:01.8</span> <span class="ok">response delivered via failover, 1.6s total</span></div>
+        <div><span class="t">00:02.1</span> <span class="ok">gateway healthy, breaker cooldown armed</span></div>
+      </div>
+      <div class="chaos-verdict">The requirement: no hang. A provider failure must resolve fast and clean, either via failover or a well-formed error. Every scenario in the suite asserts the same thing: the gateway is still answering after the dust settles.</div>
+    </div>
+  </div>
+</div>
+
+<p>Each scenario is a real script, not a story: <code>scripts/chaos.sh</code> restarts the actual containers, probes the actual gateway, and exits non-zero on failure. The interactives above walk the same assertions the script makes. The uncomfortable truth this milestone produced: I did not know my platform's failure behavior until I forced it. <span class="lead-in">Every silent assumption I had about degradation was unverified until a script made it lie to me or confess.</span></p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 5 ========== -->
+<h2 id="billing"><span class="chap">Chapter Five</span>The bug that would have double-billed everyone</h2>
+
+<p>Billing is the milestone I almost skipped as "not really infrastructure." It is actually the milestone with the least tolerance for error, because every other bug costs trust and this one costs money with a paper trail. The design in one sentence: a background sync reads per-tenant token usage from ClickHouse and pushes it to Stripe Metered Billing, and the entire module is gated behind a flag that defaults to off.</p>
+
+<p>The interesting bug is the replay problem. Sync jobs fail and retry. Networks time out. If your sync is "add 15,000 tokens to the invoice," then a retry is "add 15,000 tokens <em>again</em>." Multiply by tenants and months, and you have invented a random tax on your most active users, discoverable only when they dispute an invoice.</p>
+
+<p>The fix is Stripe's idempotency key, and the trick is what you anchor the key to. Mine is <code>axiom-{tenant}-{period}</code>. Same tenant, same period, replayed a hundred times: Stripe processes it once. But this only works if the usage action is <code>set</code> (total for the period) rather than <code>increment</code> (add to the running total), because <code>set</code> is naturally idempotent under the key while <code>increment</code> is not. Two decisions, coupled, either one wrong in isolation is a billing incident.</p>
+
+<!-- INTERACTIVE: ledger -->
+<div class="ledger" id="ledger">
+  <div class="card"><div class="n" id="lg-attempts">0</div><div class="l">sync attempts</div></div>
+  <div class="arrow">→</div>
+  <div class="card"><div class="n" id="lg-recorded">0</div><div class="l">usage records created</div></div>
+  <div class="card"><div class="n" id="lg-billed">0</div><div class="l">tokens billed</div></div>
+  <div class="controls">
+    <button class="btn" id="lg-sync" style="font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--bg); background:var(--green); border:none; border-radius:8px; padding:9px 18px; cursor:pointer;">Run sync (tenant t-1, 15,000 tokens)</button>
+    <span class="hint" style="font-family:var(--mono); font-size:11px; color:var(--faint);">click it as many times as you like. retries are free.</span>
+  </div>
+  <div class="note" id="lg-note"></div>
+</div>
+
+<p>The tests encode the paranoia: a mapped tenant with zero usage is skipped, not zero-recorded; the flag-off build registers <em>no routes at all</em>, not 403s; the admin secret gates both endpoints; and a synthetic invoice preview returns the fixture, because the test suite must never touch real Stripe. Eight tests, all dry, all deterministic.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 6 ========== -->
+<h2 id="packaging"><span class="chap">Chapter Six</span>Five repos, one tag</h2>
+
+<p>The last milestone is the one that turns a project into a platform: shipping. ADR 0007, written months earlier, made a promise the build had been quietly honoring. Develop in one workspace, structure every directory as a standalone repo, extract at release. Extraction day arrived, and the question was whether the promise held.</p>
+
+<div class="extract-demo" id="extract-demo">
+  <div class="mono-block">
+    <div class="lane">
+      <div class="node">axiom-ai<br><span style="color:var(--faint); font-size:10px;">monorepo · 1 clone</span></div>
+      <div class="beam"></div>
+      <div class="node repos" id="repos-list">
+        <span>axiom-gateway</span>
+        <span>axiom-core-shared</span>
+        <span>axiom-rag-pipeline</span>
+        <span>axiom-agent-runtime</span>
+        <span>axiom-ops-observability</span>
+      </div>
+    </div>
+    <button class="play" id="extract-play">▶ run extraction</button>
+  </div>
+</div>
+
+<p>It held, because of a rule enforced the entire build: <span class="lead-in">services never import each other, only <code>@axiom-ai/core</code>.</span> That single constraint is what makes the split mechanical instead of surgical. The extraction script (<code>scripts/extract-repos.sh</code>) stages all five repos in seconds: copies the directory, injects shared CI and license, rewrites <code>@axiom-ai/core</code> from a workspace link to <code>^1.0.0</code>, and prepares a fresh git history per repo. Cross-cutting assets (compose stacks, docs, ADRs) go to a sixth repo, <code>axiom-meta</code>.</p>
+
+<p>Then the release pipeline. One tag, <code>v1.0.0</code>, and a workflow does the rest, in order, gated:</p>
+
+<div class="mermaid-frame"><div class="frame-bar"><span class="dot"></span><span class="t">release pipeline</span><span class="live">rendered live</span></div>
+<div class="mermaid">
+sequenceDiagram
+    participant D as Developer
+    participant W as release.yml
+    participant V as Test gate
+    participant GH as GHCR
+    participant N as npm
+    D->>W: git tag v1.0.0 + push
+    W->>V: full test suite first
+    V-->>W: 240 tests green
+    par multi-arch images
+        W->>GH: buildx amd64 + arm64 (4 services)
+        GH-->>W: ghcr.io/...:1.0.0 published
+    and npm package
+        W->>N: verify tag == package.json, then publish
+        N-->>W: @axiom-ai/core@1.0.0 live
+    end
+    W->>W: GitHub release with generated notes
+</div></div>
+
+<p>Two details worth stealing for your own release. First, the npm job refuses to publish unless the tag matches <code>package.json</code> exactly; version drift between the tag and the artifact is how phantom releases happen. Second, the multi-arch build builds amd64 natively and arm64 through QEMU, which is slow for the Python image, so buildx caching is scoped per service to keep the second tag push cheap.</p>
+
+<p>Why this matters commercially, not just technically: extraction is what lets someone adopt the gateway without swallowing the whole platform. A team with their own RAG layer can pull one image. A startup can pin <code>@axiom-ai/core</code> and build their own services on the same contracts. <span class="lead-in">Monoliths get evaluated. Packages get adopted.</span></p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 7 ========== -->
+<h2 id="lessons"><span class="chap">Chapter Seven</span>What I'd tell you over coffee</h2>
+
+<p><strong>1. Ask "where does the secret go" before "does it scale."</strong> The single most valuable engineering hour of Phase 5 was tracing where an API key travels when a provider rejects a request. It found a leak path that 240 passing tests had walked past, because none of them asked the question.</p>
+
+<p><strong>2. Redaction at the logger beats redaction at the source.</strong> Ten code paths can leak a credential. One logger scrubs them all. Put the control where the exit is, not where the risk is, and enforce it with tests that fail the build.</p>
+
+<p><strong>3. A threat model is a decision record, not a document.</strong> The value is not the table. It is that every "probably fine" got replaced with either a named control or a written, dated acceptance. Future-you arguing with present-you needs the date.</p>
+
+<p><strong>4. Chaos scripts are cheaper than production incidents by about four orders of magnitude.</strong> Thirty minutes of writing a script that restarts Redis answered a question I had been carrying as unexamined faith for four months: does the gateway stay up? Now it is a CI-adjacent fact, not a belief.</p>
+
+<p><strong>5. Billing idempotency is two coupled decisions.</strong> Idempotency key anchored to the period, and <code>set</code> instead of <code>increment</code>. Either alone is half a fix. Test the replay path explicitly, because your sync job <em>will</em> be replayed whether you planned for it or not.</p>
+
+<p><strong>6. The monorepo promise only holds if you enforce the import rule from day one.</strong> Extraction worked because services never imported each other. One cross-service import in Phase 1 would have made this milestone a refactor. Architecture decisions are cheap when made early and devastating when discovered late.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 8 ========== -->
+<h2 id="fine-print"><span class="chap">Chapter Eight</span>The part most posts skip</h2>
+
+<p>Credibility comes from what you admit, so here is the ledger for Phase 5.</p>
+
+<p><strong>Benchmark numbers are still empty.</strong> The k6 profiles exist, the thresholds are declared, the chaos scenarios run, but <code>docs/benchmarks/BENCHMARKS-v1.0.md</code> has a results table with no numbers in it, because I have not executed the full load run on a defined reference machine yet. It will only ever contain measured figures. Nothing in this post is a performance claim.</p>
+
+<p><strong>The Helm chart has not been rendered.</strong> <code>helm</code> is not installed in my environment, so the umbrella chart is syntax-checked but not template-rendered against a real cluster. First <code>helm template</code> run may find something. That is what untested deployables are: findable problems, stated plainly.</p>
+
+<p><strong>Billing is test-mode only, by design.</strong> Stripe integration runs on test keys behind a default-off flag. There is no production billing path yet, and the invoice preview is admin-gated and internal. Moving it past test-mode is a deliberate future decision, not a config flip.</p>
+
+<p><strong>Extraction is staged, not pushed.</strong> The script runs in dry-run mode and produces verified staging trees (dependency rewrite confirmed, CI injected, 210 files across five repos). The actual <code>git push</code> to the five new repositories is the step I am doing with eyes open, repo by repo.</p>
+
+<p><strong>And the platform is never done.</strong> JWT revocation, real-time threat intelligence in the security workflow, per-tenant ClickHouse row policies, and production billing all remain open. That is not a disclaimer. It is what the threat model's residual-risk section looks like when it is honest: infrastructure does not finish, it reaches the state where other people can safely stand on it, and then it keeps going.</p>
+
+<footer>
+  <span class="sig">End of transmission</span>
+  <p><strong>Axiom AI</strong> is Apache-2.0: five packages, 240 passing tests, ten ADRs, one STRIDE threat model with dated acceptances, and a logger that has never met a credential it would repeat. Every claim in this post maps to a named test, script, or document in the repository.</p>
+  <p style="margin-top:10px;">Read the origin story: <a href="https://mailtotanvir.github.io/axiom-ai/blog/axiom-ai-build-log.html">I built an operating system for AI. It humbled me.</a> Then explore the platform index at <a href="https://tanvir-s-enterprise-agentic-portfolio.github.io/.github/">Tanvir's agentic portfolio</a>.</p>
+</footer>
+
+</article>
+</div>
+
+<script>
+  // mermaid diagrams: dark theme matching the page palette
+  const mermaidTheme = {
+    start: "loaded",
+    darkMode: true,
+    theme: "base",
+    themeVariables: {
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      fontSize: "13px",
+      primaryColor: "#101A2C",
+      primaryTextColor: "#E8ECF4",
+      primaryBorderColor: "#5CC8FF",
+      lineColor: "#9AA4B8",
+      secondaryColor: "#141B2B",
+      tertiaryColor: "#0A0E17",
+      noteBkgColor: "#1A1608",
+      noteTextColor: "#F5C56B",
+      noteBorderColor: "#FFC46B",
+      actorBkg: "#101A2C",
+      actorBorder: "#5CC8FF",
+      actorTextColor: "#E8ECF4",
+      signalColor: "#9AA4B8",
+      signalTextColor: "#E8ECF4",
+    },
+    flowchart: { curve: "basis", padding: 14 },
+    sequence: { actorMargin: 42, noteMargin: 10, mirrorActors: false },
+  };
+
+  function renderMermaid() {
+    if (!window.mermaid) return setTimeout(renderMermaid, 120);
+    window.mermaid.initialize(mermaidTheme);
+    window.mermaid.run({ querySelector: ".mermaid" });
+  }
+  renderMermaid();
+
+  // reading progress bar
+  const bar = document.getElementById('progress');
+  const doc = document.documentElement;
+  window.addEventListener('scroll', () => {
+    const total = doc.scrollHeight - window.innerHeight;
+    bar.style.width = (total > 0 ? (window.scrollY / total) * 100 : 0) + '%';
+  }, { passive: true });
+
+  // active chapter highlighting
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id));
+    });
+  }, { rootMargin: '-20% 0px -65% 0px' });
+  targets.forEach(t => spy.observe(t));
+
+  /* ---------- redaction lab: mirrors secrets.ts scrubText/scrubObject ---------- */
+  const PATTERNS = [
+    /\bBearer\s+[A-Za-z0-9\-._~+/=]{8,}/gi,
+    /\bsk-[A-Za-z0-9_-]{16,}\b/g,
+    /\bgsk_[A-Za-z0-9]{16,}\b/g,
+    /\bsk_(test|live)_[A-Za-z0-9]{16,}\b/g,
+    /\bAKIA[0-9A-Z]{16}\b/g,
+    /\bsha256=[a-f0-9]{32,}\b/gi,
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  ];
+  const SENSITIVE_KEYS = ["authorization","x-axiom-signature","signature","token","secret","password","cookie","apikey","api-key","api_key","credential","session"];
+  const REDACTED = "[REDACTED]";
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function scrubLine(line) {
+    // field-name redaction first (key: value shapes)
+    let nameHit = false;
+    const kv = line.match(/^(\s*)([A-Za-z0-9_.\-]+)(\s*:\s*)(.+)$/);
+    if (kv && SENSITIVE_KEYS.some(k => kv[2].toLowerCase().includes(k))) {
+      nameHit = true;
+      return { html: `${escapeHtml(kv[1])}${escapeHtml(kv[2])}${escapeHtml(kv[3])}<span class="redacted">${REDACTED}</span>`, hits: 1 };
+    }
+    // then value-pattern scrubbing
+    let hits = 0, html = escapeHtml(line);
+    for (const re of PATTERNS) {
+      html = html.replace(re, () => { hits++; return `<span class="redacted">${REDACTED}</span>`; });
+    }
+    return { html, hits };
+  }
+
+  const labIn = document.getElementById('lab-in');
+  const labOut = document.getElementById('lab-out');
+  const labDefault = labIn.value;
+  function runLab() {
+    const lines = labIn.value.split("\n");
+    let total = 0;
+    labOut.innerHTML = lines.map(line => {
+      const r = line.trim() === "" ? { html: "&nbsp;", hits: 0 } : scrubLine(line);
+      total += r.hits;
+      return r.html;
+    }).join("\n");
+    if (total > 0) {
+      labOut.innerHTML += `\n\n<span style="color:var(--faint);">// ${total} secret${total === 1 ? "" : "s"} redacted · zero bytes left the browser</span>`;
+    }
+  }
+  document.getElementById('lab-run').addEventListener('click', runLab);
+  document.getElementById('lab-reset').addEventListener('click', () => { labIn.value = labDefault; labOut.textContent = "press Scrub to run the same pattern engine the platform logs through"; });
+  labIn.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") runLab(); });
+
+  /* ---------- chaos board ---------- */
+  document.querySelectorAll('.chaos-scenario').forEach(sc => {
+    sc.addEventListener('click', () => sc.classList.toggle('open'));
+  });
+
+  /* ---------- billing ledger ---------- */
+  let lgSyncs = 0;
+  const lgAttempts = document.getElementById('lg-attempts');
+  const lgRecorded = document.getElementById('lg-recorded');
+  const lgBilled = document.getElementById('lg-billed');
+  const lgNote = document.getElementById('lg-note');
+  function flash(el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+  document.getElementById('lg-sync').addEventListener('click', () => {
+    lgSyncs++;
+    lgAttempts.textContent = lgSyncs; flash(lgAttempts);
+    // idempotency key: axiom-t-1-{period}. Same period => Stripe dedupes.
+    lgRecorded.textContent = "1"; flash(lgRecorded);
+    lgBilled.textContent = "15,000"; flash(lgBilled);
+    lgNote.textContent = `attempt #${lgSyncs} · key axiom-t-1-<period> → processed once · billed exactly 15,000 tokens`;
+  });
+
+  /* ---------- extraction animation ---------- */
+  const demo = document.getElementById('extract-demo');
+  const repoSpans = [...document.querySelectorAll('#repos-list span')];
+  let played = false;
+  document.getElementById('extract-play').addEventListener('click', () => {
+    if (played) { repoSpans.forEach(s => s.classList.remove('on')); played = false; setTimeout(arguments.callee, 450); return; }
+    played = true;
+    demo.classList.add('running');
+    repoSpans.forEach((s, i) => setTimeout(() => s.classList.add('on'), 350 + i * 280));
+    setTimeout(() => demo.classList.remove('running'), 350 + repoSpans.length * 280 + 900);
+  });
+</script>
+</body>
+</html>
