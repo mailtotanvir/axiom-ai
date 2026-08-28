@@ -1,0 +1,54 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: axiom-platform
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /v1/chat
+            pathType: Prefix
+            backend:
+              service:
+                name: axiom-gateway
+                port:
+                  number: {{ .Values.gateway.port }}
+          - path: /v1/documents
+            pathType: Prefix
+            backend:
+              service:
+                name: axiom-ragPipeline
+                port:
+                  number: {{ .Values.ragPipeline.port }}
+          - path: /v1/retrieval
+            pathType: Prefix
+            backend:
+              service:
+                name: axiom-ragPipeline
+                port:
+                  number: {{ .Values.ragPipeline.port }}
+          - path: /v1/runs
+            pathType: Prefix
+            backend:
+              service:
+                name: axiom-agentRuntime
+                port:
+                  number: {{ .Values.agentRuntime.port }}
+          - path: /v1/traces
+            pathType: Prefix
+            backend:
+              service:
+                name: axiom-opsObservability
+                port:
+                  number: {{ .Values.opsObservability.port }}
+{{- end }}

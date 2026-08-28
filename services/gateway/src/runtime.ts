@@ -26,7 +26,11 @@ import {
   ClickHouseMeterSink,
   type MeterSink,
 } from "./metering/sinks.js";
-import { PassThroughGuardrails, type GuardrailHook } from "./guardrails/guardrails.js";
+import {
+  PassThroughGuardrails,
+  createDefaultGuardrails,
+  type GuardrailHook,
+} from "./guardrails/guardrails.js";
 import {
   InMemoryCacheStore,
   InputCache,
@@ -141,7 +145,17 @@ export async function buildRuntime(config: GatewayConfig): Promise<GatewayRuntim
       ? [new ClickHouseMeterSink(config.CLICKHOUSE_NODES)]
       : [new ConsoleMeterSink()];
 
-  const guardrails: GuardrailHook = new PassThroughGuardrails();
+  const guardrailsConfig = config.GATEWAY_GUARDRAILS;
+  const guardrails: GuardrailHook =
+    guardrailsConfig !== undefined
+      ? (guardrailsConfig.enabled
+          ? createDefaultGuardrails({
+              piiMode: guardrailsConfig.piiMode,
+              policyEnabled: guardrailsConfig.policyEnabled,
+              bannedKeywords: guardrailsConfig.bannedKeywords,
+            })
+          : new PassThroughGuardrails())
+      : createDefaultGuardrails();
 
   const experiments =
     config.OPS_CONTROL_PLANE_URL !== undefined

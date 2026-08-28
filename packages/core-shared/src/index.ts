@@ -5,3 +5,5 @@ export * from "./errors.js";
 export * from "./crypto.js";
 export * from "./config.js";
 export * from "./telemetry.js";
+export * from "./metrics.js";
+export * from "./secrets.js";

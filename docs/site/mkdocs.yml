@@ -1,0 +1,37 @@
+site_name: Axiom AI
+site_description: Five-package LLM infrastructure platform - gateway, RAG, agent runtime, ops, core-shared.
+repo_url: https://github.com/mailtotanvir/axiom-ai
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: black
+      accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Core Concepts:
+      - Architecture: concepts/architecture.md
+      - Tenancy: concepts/tenancy.md
+      - Sandbox Isolation: concepts/sandbox.md
+  - Tutorials:
+      - First Proxy Call: tutorials/first-proxy-call.md
+      - Build a RAG Index: tutorials/rag-index.md
+      - Run an Agent: tutorials/run-agent.md
+      - Prompt Evals: tutorials/prompt-evals.md
+  - API Reference: api-reference.md
+  - Operations:
+      - Benchmarks: benchmarks.md
+      - Security: security.md
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight

@@ -1,0 +1,78 @@
+{{/*
+Umbrella template: renders a Deployment + Service per enabled service.
+Single template keeps the four services structurally identical.
+*/}}
+{{- range $name, $svc := dict "gateway" $.Values.gateway "ragPipeline" $.Values.ragPipeline "agentRuntime" $.Values.agentRuntime "opsObservability" $.Values.opsObservability }}
+{{- if $svc.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: axiom-{{ $name }}
+  labels:
+    app.kubernetes.io/name: axiom-{{ $name }}
+    app.kubernetes.io/part-of: axiom-platform
+spec:
+  replicas: {{ $svc.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: axiom-{{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: axiom-{{ $name }}
+        app.kubernetes.io/part-of: axiom-platform
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ $svc.port }}"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: service
+          image: "{{ $.Values.global.imageRegistry }}/{{ $svc.image }}:{{ $svc.tag }}"
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ $svc.port }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: {{ $svc.port }}
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ $svc.port }}
+            initialDelaySeconds: 10
+          resources:
+            {{- toYaml $svc.resources | nindent 12 }}
+          env:
+            - name: AXIOM_ENV
+              value: {{ $.Values.global.axiomsEnv | quote }}
+            {{- if $.Values.global.interServiceSecretExistingSecret }}
+            - name: AXIOM_INTER_SERVICE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.global.interServiceSecretExistingSecret }}
+                  key: inter-service-secret
+            {{- end }}
+            {{- range $key, $value := $svc.env }}
+            {{- if $value }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: axiom-{{ $name }}
+  labels:
+    app.kubernetes.io/name: axiom-{{ $name }}
+spec:
+  selector:
+    app.kubernetes.io/name: axiom-{{ $name }}
+  ports:
+    - port: {{ $svc.port }}
+      targetPort: {{ $svc.port }}
+{{- end }}
+{{- end }}

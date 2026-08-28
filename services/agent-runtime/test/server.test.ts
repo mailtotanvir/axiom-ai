@@ -15,6 +15,14 @@ describe("agent-runtime scaffold", () => {
     });
   });
 
+  it("serves prometheus metrics with http request duration", async () => {
+    const response = await request(app).get("/metrics");
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/plain");
+    expect(response.text).toContain("# HELP http_server_request_duration_seconds");
+    expect(response.text).toContain('job="agent-runtime"');
+  });
+
   it("accepts webhook test deliveries with 202", async () => {
     const response = await request(app)
       .post("/v1/webhooks/test")

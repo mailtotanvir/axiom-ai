@@ -10,6 +10,10 @@ export const opsConfigSchema = baseConfigSchema
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
     /** Global baseline; per-tenant policies narrow this further at query time. */
     TRACE_RETENTION_DEFAULT_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
+    /** Milestone 5.4: billing stays off unless explicitly enabled (test keys only). */
+    AXIOM_BILLING_ENABLED: z.enum(["true", "false"]).default("false"),
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_TENANT_SUBSCRIPTION_ITEMS: z.string().optional(),
   });
 
 export type OpsConfig = z.infer<typeof opsConfigSchema>;

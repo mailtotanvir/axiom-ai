@@ -1,0 +1,67 @@
+# Umbrella values. Each service renders as a Deployment + Service and
+# inherits resource/defaultConfig blocks; per-service overrides win.
+global:
+  imageRegistry: ghcr.io
+  imagePullPolicy: IfNotPresent
+  axiomsEnv: production
+  interServiceSecretExistingSecret: ""  # set to reuse an existing secret
+
+gateway:
+  enabled: true
+  image: axiom-ai/axiom-gateway
+  tag: "1.0.0"
+  replicas: 2
+  port: 3000
+  env:
+    GROQ_API_KEY: ""           # provide via secret in production
+    MISTRAL_API_KEY: ""
+  resources:
+    requests: { cpu: 250m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }
+
+ragPipeline:
+  enabled: true
+  image: axiom-ai/axiom-rag-pipeline
+  tag: "1.0.0"
+  replicas: 2
+  port: 8000
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+agentRuntime:
+  enabled: true
+  image: axiom-ai/axiom-agent-runtime
+  tag: "1.0.0"
+  replicas: 2
+  port: 5000
+  sandbox:
+    maxCpuMs: 1000
+    maxHeapMb: 128
+  resources:
+    requests: { cpu: 500m, memory: 512Mi }
+    limits: { cpu: "2", memory: 1Gi }
+
+opsObservability:
+  enabled: true
+  image: axiom-ai/axiom-ops-observability
+  tag: "1.0.0"
+  replicas: 1
+  port: 4000
+  billing:
+    enabled: false            # test-mode only until promoted
+  resources:
+    requests: { cpu: 250m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }
+
+ingress:
+  enabled: true
+  className: traefik
+  host: axiom.example.com
+  tls:
+    enabled: true
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 30s

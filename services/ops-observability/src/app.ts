@@ -6,7 +6,14 @@
 
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 
-import { AxiomError, CORE_VERSION, errors, initTelemetry } from "@axiom-ai/core";
+import {
+  AxiomError,
+  CORE_VERSION,
+  createHttpMetrics,
+  errors,
+  globalMetrics,
+  initTelemetry,
+} from "@axiom-ai/core";
 import { PrismaClient } from "@prisma/client";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -30,6 +37,9 @@ import { registerExperimentRoutes } from "./experiments/routes.js";
 import { PrismaExperimentStore } from "./experiments/store.js";
 import type { ExperimentStore } from "./experiments/store.js";
 import { InMemoryExperimentStore } from "./experiments/stores.js";
+import { type BillingSync } from "./billing/billing.js";
+import { billingEnabled } from "./billing/billing.js";
+import { registerBillingRoutes } from "./billing/routes.js";
 
 export interface OpsStores {
   clickhouse?: ClickHouseClient;
@@ -39,6 +49,8 @@ export interface OpsStores {
   evalStore?: EvalStore;
   evalRunner?: EvalRunnerType;
   experimentStore?: ExperimentStore;
+  /** Prebuilt billing sync (test seam); present only when billing is enabled. */
+  billingSync?: BillingSync;
 }
 
 /** Applies the prompt-registry DDL idempotently (see prisma/ddl.sql). */
@@ -62,8 +74,31 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
     otlpEndpoint: config.OTEL_EXPORTER_OTLP_ENDPOINT,
   });
 
+  const httpMetrics = createHttpMetrics("ops-observability");
+
   const app = Fastify({ logger: { level: config.LOG_LEVEL } });
   app.decorate("telemetry", telemetry);
+
+  app.addHook("onRequest", (request, _reply, done) => {
+    (request.raw as { __startTime?: bigint }).__startTime = process.hrtime.bigint();
+    done();
+  });
+
+  app.addHook("onResponse", (request, reply, done) => {
+    const start = (request.raw as { __startTime?: bigint }).__startTime;
+    if (start) {
+      const elapsedNs = Number(process.hrtime.bigint() - start);
+      const elapsedSeconds = elapsedNs / 1e9;
+      const route = request.routeOptions?.url || request.url.split("?")[0] || "unknown";
+      httpMetrics.record(request.method, route, reply.statusCode, elapsedSeconds);
+    }
+    done();
+  });
+
+  app.get("/metrics", async (_request, reply) => {
+    void reply.header("content-type", "text/plain; version=0.0.4; charset=utf-8");
+    return globalMetrics.getMetricsAsText();
+  });
 
   const clickhouse =
     stores.clickhouse ??
@@ -195,6 +230,14 @@ export function buildApp(config: OpsConfig, stores: OpsStores = {}): FastifyInst
     registry,
     internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
   });
+
+  if (billingEnabled(config) && stores.billingSync) {
+    registerBillingRoutes(app, {
+      config,
+      billingSync: stores.billingSync,
+      internalSecret: config.AXIOM_INTER_SERVICE_SECRET,
+    });
+  }
 
   app.decorate("closeStores", async () => {
     await retention?.close();

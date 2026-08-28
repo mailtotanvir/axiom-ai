@@ -1,0 +1,7 @@
+apiVersion: v2
+name: axiom-platform
+description: Umbrella Helm chart for the Axiom AI platform (gateway, RAG pipeline, agent runtime, ops plane).
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+dependencies: []

@@ -1,6 +1,18 @@
 import express, { type Express, type Request, type Response } from "express";
 
-import { CORE_VERSION, errors, SIGNATURE_HEADER, verifySignature } from "@axiom-ai/core";
+import {
+  CORE_VERSION,
+  createHttpMetrics,
+  errors,
+  globalMetrics,
+  SIGNATURE_HEADER,
+  verifySignature,
+} from "@axiom-ai/core";
+
+export const queueDepthGauge = globalMetrics.registerGauge(
+  "agent_runtime_queue_depth",
+  "Current depth of agent runtime execution queues",
+);
 
 export interface ServerOptions {
   /** When true, webhook endpoints reject unsigned/tampered deliveries. */
@@ -30,8 +42,26 @@ export function resetRecordedDeliveries(): void {
 
 export function buildServer(options: ServerOptions = {}): Express {
   const app = express();
+  const httpMetrics = createHttpMetrics("agent-runtime");
+
+  app.use((req: Request, res: Response, next) => {
+    const start = process.hrtime.bigint();
+    res.on("finish", () => {
+      const elapsedNs = Number(process.hrtime.bigint() - start);
+      const elapsedSeconds = elapsedNs / 1e9;
+      const route = req.path || "unknown";
+      httpMetrics.record(req.method, route, res.statusCode, elapsedSeconds);
+    });
+    next();
+  });
+
   // Preserve the exact request bytes so signature verification is possible.
   app.use(express.raw({ type: "*/*", limit: "5mb" }));
+
+  app.get("/metrics", (_req: Request, res: Response) => {
+    res.setHeader("content-type", "text/plain; version=0.0.4; charset=utf-8");
+    res.status(200).send(globalMetrics.getMetricsAsText());
+  });
 
   app.get("/healthz", (_req: Request, res: Response) => {
     res.status(200).json({ status: "ok", service: "axiom-agent-runtime", version: CORE_VERSION });

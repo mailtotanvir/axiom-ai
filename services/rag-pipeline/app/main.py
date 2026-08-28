@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
@@ -18,12 +19,14 @@ import httpx
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from starlette.requests import Request as StarletteRequest
+from starlette.responses import PlainTextResponse
 from starlette.responses import Response as StarletteResponse
 
-from app.api import knowledge
+from app.api import health, knowledge
 from app.core.config import Settings, get_settings
 from app.core.documents import build_document_store
 from app.core.embeddings import build_embedding_provider
+from app.core.metrics import record_request, registry
 from app.core.vectorstore import QdrantRestVectorStore, VectorStore
 from app.services.ingestion import IngestionService
 from app.services.retrieval import RetrievalService
@@ -133,6 +136,26 @@ def create_app(
         lifespan=lifespan,
     )
     _axiom_error_contract(built)
+
+    @built.middleware("http")
+    async def metrics_middleware(
+        request: StarletteRequest, call_next: Callable[[StarletteRequest], object]
+    ) -> StarletteResponse:
+        start_time = time.perf_counter()
+        response = await call_next(request)  # type: ignore[misc]
+        duration = time.perf_counter() - start_time
+        route = request.url.path
+        record_request(request.method, route, response.status_code, duration)
+        return response  # type: ignore[return-value]
+
+    @built.get("/metrics")
+    async def metrics_endpoint() -> StarletteResponse:
+        return PlainTextResponse(
+            registry.get_metrics_text(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
+
+    built.include_router(health.router)
     built.include_router(knowledge.router_ingest)
     built.include_router(knowledge.router_retrieve)
     return built

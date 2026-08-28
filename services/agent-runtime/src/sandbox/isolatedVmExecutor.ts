@@ -12,9 +12,15 @@
  */
 
 import ivm from "isolated-vm";
+import { globalMetrics, type Counter } from "@axiom-ai/core";
 
 import type { SandboxExecution, SandboxExecutor } from "./types.js";
 import type { ToolExecutionResult } from "../agents/types.js";
+
+const sandboxRejections: Counter = globalMetrics.registerCounter(
+  "agent_runtime_sandbox_rejections_total",
+  "Total number of tool sandbox rejections by reason",
+);
 
 const WRAP_PREFIX = "const __input = ";
 const HARNESS_SUFFIX = `
@@ -83,7 +89,9 @@ export class IsolatedVmExecutor implements SandboxExecutor {
       }
       return { ok: true, payload: result };
     } catch (error) {
-      return classify(error);
+      const outcome = classify(error);
+      sandboxRejections.inc({ reason: outcome.kind ?? "runtime" });
+      return outcome;
     } finally {
       // Memory-exhausted isolates self-dispose.
       if (isolate !== undefined && !isolate.isDisposed) {

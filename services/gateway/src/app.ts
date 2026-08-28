@@ -1,7 +1,15 @@
 import Fastify from "fastify";
 import type { FastifyError, FastifyInstance, FastifyReply } from "fastify";
 
-import { AxiomError, CORE_VERSION, errors, initTelemetry, type TelemetryHandle } from "@axiom-ai/core";
+import {
+  AxiomError,
+  CORE_VERSION,
+  createHttpMetrics,
+  errors,
+  globalMetrics,
+  initTelemetry,
+  type TelemetryHandle,
+} from "@axiom-ai/core";
 
 import type { GatewayConfig } from "./config.js";
 import { buildRuntime, seedDevKeyIfMemoryStore, type GatewayRuntime } from "./runtime.js";
@@ -28,6 +36,7 @@ export async function buildApp(
   });
 
   const runtime = runtimeOverride ?? (await buildRuntime(config));
+  const httpMetrics = createHttpMetrics("gateway");
 
   const app = Fastify({
     logger: {
@@ -48,6 +57,27 @@ export async function buildApp(
   });
   app.decorate("telemetry", telemetry);
   app.decorate("runtime", runtime);
+
+  app.addHook("onRequest", (request, _reply, done) => {
+    (request.raw as { __startTime?: bigint }).__startTime = process.hrtime.bigint();
+    done();
+  });
+
+  app.addHook("onResponse", (request, reply, done) => {
+    const start = (request.raw as { __startTime?: bigint }).__startTime;
+    if (start) {
+      const elapsedNs = Number(process.hrtime.bigint() - start);
+      const elapsedSeconds = elapsedNs / 1e9;
+      const route = request.routeOptions?.url || request.url.split("?")[0] || "unknown";
+      httpMetrics.record(request.method, route, reply.statusCode, elapsedSeconds);
+    }
+    done();
+  });
+
+  app.get("/metrics", async (_request, reply) => {
+    void reply.header("content-type", "text/plain; version=0.0.4; charset=utf-8");
+    return globalMetrics.getMetricsAsText();
+  });
 
   app.setErrorHandler((error: FastifyError | unknown, request, reply: FastifyReply) => {
     if (error instanceof AxiomError) {

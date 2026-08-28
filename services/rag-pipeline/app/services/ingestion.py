@@ -19,6 +19,7 @@ from app.core.documents import (
     new_document_id,
 )
 from app.core.embeddings import EmbeddingProvider
+from app.core.guardrails import redact_pii
 from app.core.parsers import parse_document
 from app.core.vectorstore import TenantVectorScope, VectorPoint, VectorStore, scope_for
 
@@ -123,9 +124,10 @@ class IngestionService:
         try:
             self.documents.update_status(tenant_id, document_id, DocumentStatus.PARSING)
             parsed = parse_document(resolved_type, raw)
+            sanitized_text, _ = redact_pii(parsed.text, tenant_id=tenant_id)
 
             self.documents.update_status(tenant_id, document_id, DocumentStatus.CHUNKING)
-            chunks = chunk_text(parsed.text, strategy=_strategy_for(document_id))
+            chunks = chunk_text(sanitized_text, strategy=_strategy_for(document_id))
 
             self.documents.update_status(tenant_id, document_id, DocumentStatus.EMBEDDING)
             vectors = self.embeddings.embed([chunk.text for chunk in chunks])
