@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Phase 5: The Hard Part Was Proving It Was Safe</title>
+<title>The shift from AI toolkit to ecosystem: lessons learned the hard way</title>
 <style>
   :root {
     /* surface scale: near-black with a cool cast (encyclopedia token system) */
@@ -370,10 +370,11 @@
     <li><a href="#demo-trap">The demo trap</a></li>
     <li><a href="#secrets">The log that could have cost me everything</a></li>
     <li><a href="#threat">Writing my own attack plan</a></li>
+    <li><a href="#anatomy">The engineering behind the proof</a></li>
     <li><a href="#chaos">Breaking my own platform on purpose</a></li>
     <li><a href="#billing">The bug that would have double-billed everyone</a></li>
     <li><a href="#packaging">Five repos, one tag</a></li>
-    <li><a href="#lessons">What I'd tell you over coffee</a></li>
+    <li><a href="#lessons">Hard-won lessons</a></li>
     <li><a href="#fine-print">The part most posts skip</a></li>
   </ol>
 </nav>
@@ -389,7 +390,7 @@
   <span>1 THREAT MODEL</span>&nbsp;&nbsp;
   <span>0 SECRETS LEAKED</span>
 </div>
-<h1>Phase 4 shipped the platform. Phase 5 asked: <em>can you prove it's safe?</em></h1>
+<h1>The shift from AI toolkit to <em>ecosystem</em>: lessons learned the hard way</h1>
 
 <p class="standfirst">The first post in this series ended with a platform that worked. This one starts with the question that kept me up after publishing it: working for whom? A gateway that works but logs your users' API keys in plaintext is not infrastructure. It's an incident report waiting for a date. Phase 5 was five milestones of proving my own platform would not hurt anyone, and it changed how I think about what "done" means.</p>
 
@@ -502,8 +503,65 @@ flowchart LR
 
 <div class="chapter-end">· · ·</div>
 
-<!-- ========== CH 4 ========== -->
-<h2 id="chaos"><span class="chap">Chapter Four</span>Breaking my own platform on purpose</h2>
+<!-- ========== CH 3.5 ENGINEERING ========== -->
+<h2 id="anatomy"><span class="chap">Chapter Three and a Half</span>The engineering behind the proof</h2>
+
+<p>The story so far has been deliberately narrative. If you are an AI engineer or an ML platform lead, this interlude is the part you actually came for: what the hardening is made of, which libraries carry which guarantees, and where the residual risk deliberately still lives. Everything below maps to a file in the repository.</p>
+
+<h3>The control plane that enforces redaction</h3>
+<p>The logger is not a wrapper around <code>console.log</code>. <code>packages/core-shared/src/telemetry</code> ships <code>createSafeLogger</code>, <code>scrubObject</code>, and <code>scrubSpanAttribute</code> as one engine. The key architectural decision: scrubbing runs on <em>both exits</em>, stdout logs and OTel span attributes. A secret that survives the log path but rides a span attribute into ClickHouse is still a leak, so the span exporter goes through the same pattern engine. One threat-model row covers both sinks; one test suite asserts both.</p>
+
+<h3>The stack, and why each piece earns its place</h3>
+
+<table>
+  <thead><tr><th>Capability</th><th>Stack</th><th>The pattern doing the work</th><th>Verified by</th></tr></thead>
+  <tbody>
+    <tr><td>Gateway / metrics</td><td>Node 20, Fastify 5, ioredis, pg</td><td>Decorator-based route registration; <code>/metrics</code> exposed per service via Prometheus text format on the internal network only</td><td>CI smoke + scrape checks</td></tr>
+    <tr><td>Secret scrubbing</td><td><code>@axiom-ai/core</code> (Zod 3, OTel SDK base)</td><td>Three-layer scrubber: sensitive key names, serialized header objects, credential-shaped value regexes</td><td>16 redaction tests failing the build</td></tr>
+    <tr><td>RAG pipeline</td><td>Python 3, FastAPI, Pydantic v2, pypdf, psycopg3 pool</td><td>Tenant scope derived from verified JWT claims and applied as a mandatory filter at the data layer, never as a caller-supplied parameter</td><td>Nine red-team tenancy tests, fail-closed</td></tr>
+    <tr><td>Agent runtime</td><td>Node 20, BullMQ 5, isolated-vm 7, Express 4, pg</td><td>Event-sourced runs: append-only <code>run_events</code> in Postgres, replay resumes after the last completed step, idempotency keys on every tool call</td><td>Kill-the-worker-mid-run test</td></tr>
+    <tr><td>Ops plane</td><td>Fastify 5, Prisma 6, Ajv</td><td>Stripe sync behind a default-off flag; <code>set</code>-semantics usage records anchored to <code>axiom-{tenant}-{period}</code> idempotency keys</td><td>8 dry, deterministic billing tests</td></tr>
+  </tbody>
+</table>
+
+<details>
+<summary>Why the same logger contract across TypeScript and Python services?</summary>
+<div class="inner">
+  <p>The TS services share the scrubber via <code>@axiom-ai/core</code>. The RAG pipeline is Python (FastAPI/Pydantic), so it cannot import the module. Instead the contract is enforced structurally: Pydantic models forbid credential-shaped fields in log payloads, and the security workflow (gitleaks, Trivy, CodeQL in <code>.github/workflows/security.yml</code>) scans every language. A cross-language contract cannot be a shared library; it has to be a shared CI gate. That is the pattern I would keep at any team size.</p>
+</div>
+</details>
+
+<h3>Security posture: what is enforced, what is accepted</h3>
+<p>The CI security workflow runs three independent scanners with different failure classes: <strong>CodeQL</strong> (semantic queries for injection and unsafe deserialization), <strong>gitleaks</strong> (credential shapes in diffed history), <strong>Trivy</strong> (dependency CVEs and image layers). A threat-model acceptance never substitutes for a scanner and vice versa. The full matrix, with per-service STRIDE tables, lives in <code>docs/security/</code>; the platform-level summary:</p>
+
+<table>
+  <thead><tr><th>STRIDE class</th><th>Platform control</th></tr></thead>
+  <tbody>
+    <tr><td>Spoofing</td><td>JWT (RS256) tenant identity on every request; HMAC-SHA256 on webhooks and inter-service callbacks</td></tr>
+    <tr><td>Tampering</td><td>Signed payloads with timestamp + replay window; Zod/Pydantic validation at every ingress; append-only run/event logs</td></tr>
+    <tr><td>Repudiation</td><td>Event-sourced runs and ClickHouse metering keyed by <code>axiom.request.id</code>; one W3C trace id across all services</td></tr>
+    <tr><td>Info disclosure</td><td>Secret scrubbing on logs and span attributes; tenant isolation filters in Qdrant and SQL</td></tr>
+    <tr><td>DoS</td><td>Sliding-window limiter, circuit-breaker failover chains, BullMQ queue caps, sandbox CPU/memory hard caps</td></tr>
+    <tr><td>Elevation</td><td>isolated-vm with no host bindings; JWT-derived (never client-supplied) tenant scoping; Prometheus/Grafana internal-network-only</td></tr>
+  </tbody>
+</table>
+
+<h3>Tech risk register, as a first-class artifact</h3>
+<p>The residual-risk section of <code>THREAT-MODEL.md</code> is the document I re-read most. Each entry names the risk, the reason it is accepted, and the trigger that reopens it:</p>
+
+<div class="aside warn">
+  <span class="tag">Accepted for v1.0, with reopen triggers</span>
+  <p><strong>1. JWT revocation is not real-time.</strong> Compromised tokens live until expiry. Reopen when: multi-tenant production traffic, or token lifetimes exceed 15 minutes.<br>
+  <strong>2. Provider prompt caches are external.</strong> Data-residency question the platform cannot answer for a tenant. Mitigation: config flag disables native caching per tenant. Reopen when: a regulated-tenant deployment.<br>
+  <strong>3. Grafana/Prometheus are internal-network-only.</strong> Reopen when: any exposure, which requires an SSO proxy ahead of Traefik first.</p>
+</div>
+
+<p>For an AI engineer, the takeaway I would want: <strong>the interesting engineering is not the five capabilities, it is the discipline that every claim has a named test, every acceptance has a date, and every cross-language contract is a CI gate rather than a hope.</strong> For a CTO or CAIO, the takeaway is different: this is the checklist your platform team should be able to produce on demand. If they cannot name their threat model's residual risks and their reopen triggers, the platform is not hardened, it is unexamined.</p>
+
+<div class="chapter-end">· · ·</div>
+
+<!-- ========== CH 5 ========== -->
+<h2 id="chaos"><span class="chap">Chapter Five</span>Breaking my own platform on purpose</h2>
 
 <p>Load testing tells you how fast your platform is. Chaos testing tells you whether it is honest when things go wrong. The distinction matters because the failure modes are opposite: load failures are loud, chaos failures are silent. A restart of Redis does not produce an error page. It produces <em>whatever your code does when a cache returns nothing</em>, which might be "serves traffic fine" or might be "every request 500s and the pager melts."</p>
 
@@ -558,8 +616,8 @@ flowchart LR
 
 <div class="chapter-end">· · ·</div>
 
-<!-- ========== CH 5 ========== -->
-<h2 id="billing"><span class="chap">Chapter Five</span>The bug that would have double-billed everyone</h2>
+<!-- ========== CH 6 ========== -->
+<h2 id="billing"><span class="chap">Chapter Six</span>The bug that would have double-billed everyone</h2>
 
 <p>Billing is the milestone I almost skipped as "not really infrastructure." It is actually the milestone with the least tolerance for error, because every other bug costs trust and this one costs money with a paper trail. The design in one sentence: a background sync reads per-tenant token usage from ClickHouse and pushes it to Stripe Metered Billing, and the entire module is gated behind a flag that defaults to off.</p>
 
@@ -584,8 +642,8 @@ flowchart LR
 
 <div class="chapter-end">· · ·</div>
 
-<!-- ========== CH 6 ========== -->
-<h2 id="packaging"><span class="chap">Chapter Six</span>Five repos, one tag</h2>
+<!-- ========== CH 7 ========== -->
+<h2 id="packaging"><span class="chap">Chapter Seven</span>Five repos, one tag</h2>
 
 <p>The last milestone is the one that turns a project into a platform: shipping. ADR 0007, written months earlier, made a promise the build had been quietly honoring. Develop in one workspace, structure every directory as a standalone repo, extract at release. Extraction day arrived, and the question was whether the promise held.</p>
 
@@ -637,8 +695,8 @@ sequenceDiagram
 
 <div class="chapter-end">· · ·</div>
 
-<!-- ========== CH 7 ========== -->
-<h2 id="lessons"><span class="chap">Chapter Seven</span>What I'd tell you over coffee</h2>
+<!-- ========== CH 8 ========== -->
+<h2 id="lessons"><span class="chap">Chapter Eight</span>Hard-won lessons, half engineering half scar tissue</h2>
 
 <p><strong>1. Ask "where does the secret go" before "does it scale."</strong> The single most valuable engineering hour of Phase 5 was tracing where an API key travels when a provider rejects a request. It found a leak path that 240 passing tests had walked past, because none of them asked the question.</p>
 
@@ -654,8 +712,8 @@ sequenceDiagram
 
 <div class="chapter-end">· · ·</div>
 
-<!-- ========== CH 8 ========== -->
-<h2 id="fine-print"><span class="chap">Chapter Eight</span>The part most posts skip</h2>
+<!-- ========== CH 9 ========== -->
+<h2 id="fine-print"><span class="chap">Chapter Nine</span>The part most posts skip</h2>
 
 <p>Credibility comes from what you admit, so here is the ledger for Phase 5.</p>
 
@@ -667,12 +725,12 @@ sequenceDiagram
 
 <p><strong>Extraction is staged, not pushed.</strong> The script runs in dry-run mode and produces verified staging trees (dependency rewrite confirmed, CI injected, 210 files across five repos). The actual <code>git push</code> to the five new repositories is the step I am doing with eyes open, repo by repo.</p>
 
-<p><strong>And the platform is never done.</strong> JWT revocation, real-time threat intelligence in the security workflow, per-tenant ClickHouse row policies, and production billing all remain open. That is not a disclaimer. It is what the threat model's residual-risk section looks like when it is honest: infrastructure does not finish, it reaches the state where other people can safely stand on it, and then it keeps going.</p>
+<p><strong>And the platform is never done.</strong> JWT revocation, real-time threat intelligence in the security workflow, per-tenant ClickHouse row policies, and production billing all remain open. That is not a disclaimer. It is what the threat model's residual-risk section looks like when it is honest: hardening is not a milestone you complete, it is a posture you maintain, and the reopen triggers in the risk register above are how it stays maintainable instead of aspirational.</p>
 
 <footer>
   <span class="sig">End of transmission</span>
   <p><strong>Axiom AI</strong> is Apache-2.0: five packages, 240 passing tests, ten ADRs, one STRIDE threat model with dated acceptances, and a logger that has never met a credential it would repeat. Every claim in this post maps to a named test, script, or document in the repository.</p>
-  <p style="margin-top:10px;">Read the origin story: <a href="https://mailtotanvir.github.io/axiom-ai/blog/axiom-ai-build-log.html">I built an operating system for AI. It humbled me.</a> Then explore the platform index at <a href="https://tanvir-s-enterprise-agentic-portfolio.github.io/.github/">Tanvir's agentic portfolio</a>.</p>
+  <p>Read the origin story: <a href="https://mailtotanvir.github.io/axiom-ai/blog/axiom-ai-build-log.html">I built an operating system for AI. It humbled me.</a> It covers Phases 0 to 4 and ends on the exact gaps this post closes: metrics, security, chaos, billing, packaging.</p>
 </footer>
 
 </article>

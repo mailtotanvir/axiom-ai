@@ -242,7 +242,6 @@ footer .sig::before { content:"●"; color: var(--green); font-size: 7px; vertic
     <li><a href="#fine-print">The part most posts skip</a></li>
   </ol>
 </nav>
-
 <!-- ================= ARTICLE ================= -->
 <article>
 
@@ -359,6 +358,15 @@ flowchart TD
 </details>
 
 <p>My favorite piece hides in the economics. Most teams treat caching as an optimization footnote. Here it's a first-class subsystem with its own dashboard, its own hit-rate metrics, and its own honest limitation recorded in the docs: the exact-match tier is process-local until the multi-worker scale-out lands. Saying what isn't done is part of the feature.</p>
+
+<details>
+<summary>The stack, precisely: what the gateway is actually built from</summary>
+<div class="inner">
+  <p><strong>Runtime:</strong> Node 20, TypeScript, Fastify 5 (chosen over Express for the gateway specifically because route-level hooks map cleanly onto the auth → validate → route pipeline, and Fastify's logger hooks are where the redaction engine attaches). <strong>State:</strong> ioredis for the sliding-window limiter and cache tier, <code>pg</code> for the hashed API-key store. <strong>Contracts:</strong> Zod schemas from <code>@axiom-ai/core</code> validate every wire body; a request that fails schema validation never reaches a provider adapter.</p>
+  <p><strong>Provider layer:</strong> one <code>ProviderAdapter</code> interface with an <code>openaiCompatible.ts</code> implementation covering Groq, Mistral, Gemini's OpenAI-compat endpoint, SiliconFlow, and NVIDIA NIM, plus a dedicated Anthropic adapter for its differing wire format. A <code>classify.ts</code> module maps provider error classes to breaker decisions, so a 429 from one provider is not treated as a 500 from another. <strong>Streaming:</strong> <code>sse.ts</code> hijacks the raw socket for passthrough; <code>sseUsage.ts</code> parses usage deltas out of the stream for metering without buffering the whole completion.</p>
+  <p><strong>Metering:</strong> async batched sink into ClickHouse, with a <code>reconciliation_delta</code> column comparing the estimate against provider-reported usage. The sink is deliberately off the request's critical path; the chaos suite proves the gateway survives ClickHouse being down entirely.</p>
+</div>
+</details>
 
 <div class="chapter-end">· · ·</div>
 
@@ -496,6 +504,18 @@ sequenceDiagram
 <p>The story so far has been deliberately narrative. This interlude is for the reader who now wants to see the machine: what runs where, what talks to what, and how one request actually moves through all of it.</p>
 
 <h3>Everything that runs, on one page</h3>
+
+<table>
+  <thead><tr><th>Package</th><th>Language / framework</th><th>Key libraries</th><th>Owns</th></tr></thead>
+  <tbody>
+    <tr><td><code>axiom-gateway</code> :3000</td><td>TypeScript / Fastify 5</td><td>ioredis, pg, js-tiktoken, Zod</td><td>Auth, rate limits, failover, caching, metering</td></tr>
+    <tr><td><code>axiom-rag-pipeline</code> :8000</td><td>Python / FastAPI + Pydantic v2</td><td>psycopg3, pypdf, httpx</td><td>Ingestion, chunking, embeddings, retrieval</td></tr>
+    <tr><td><code>axiom-agent-runtime</code> :5000</td><td>TypeScript / Express 4</td><td>BullMQ 5, isolated-vm 7, pg</td><td>Event-sourced runs, sandboxed tools, webhooks</td></tr>
+    <tr><td><code>axiom-ops-observability</code> :4000</td><td>TypeScript / Fastify 5</td><td>Prisma 6, Ajv, pg</td><td>Traces, prompt registry, evals, A/B stats, billing</td></tr>
+    <tr><td><code>@axiom-ai/core</code> (npm)</td><td>TypeScript</td><td>Zod, OTel SDK (@opentelemetry/sdk-trace-base), pg</td><td>Types, config schemas, HMAC crypto, telemetry, protobuf contracts</td></tr>
+  </tbody>
+</table>
+<p class="dim" style="font-size:14px;">Versions are pinned in each package manifest; the constraint that shaped this stack is that only <code>@axiom-ai/core</code> is published, so every shared dependency upgrade is a single semver-gated decision.</p>
 
 <div class="mermaid-frame"><div class="frame-bar"><span class="dot"></span><span class="t">system diagram</span><span class="live">rendered live</span></div>
 <div class="mermaid">
@@ -663,7 +683,9 @@ sequenceDiagram
 
 <p><strong>And document the deviations.</strong> The port conflict, the swapped cache backend, the forward-looking metrics scrapes. Readers trust documentation that admits limits. I trust engineers who write them.</p>
 
-<h3>If you build products on AI (and don't want the code tour)</h3>
+<h3>What different readers should take away</h3>
+
+<p>The asides below are aimed at different readers on purpose. If you build products on AI, the five questions are your procurement checklist. If you write AI systems, the patterns are the transferable seams and gates. If you own the budget, the CTO list is what to demand in a design review before writing a check.</p>
 <div class="aside">
   <span class="tag">Ask these five questions about any AI system you own or buy</span>
   <p>1. Which providers does it fall back to when one dies?<br>
@@ -672,6 +694,26 @@ sequenceDiagram
      4. What prevents two customers' data from mixing?<br>
      5. Who approves a prompt change before users feel it?</p>
   <p>Silence on any of these isn't a platform gap. It's uninsured risk, waiting to be priced.</p>
+</div>
+
+<h3>If you're an AI engineer or ML expert</h3>
+<div class="aside good">
+  <span class="tag">The transferable patterns</span>
+  <p><strong>Adapters + error classification:</strong> one provider interface, with a classifier that maps provider errors to breaker semantics (a 429 is throttling, not failure) so fallback chains behave deterministically.<br>
+  <strong>Structural tenancy:</strong> tenant scope injected from verified JWT claims as a mandatory data-layer filter. Callers supply intent, never scope. This deletes the entire "caller passed the wrong filter" bug class.<br>
+  <strong>Event sourcing over workflow engines:</strong> append-only run events + idempotency keys at every boundary gave 90% of Temporal's durability on plain BullMQ.<br>
+  <strong>Byte-level contract tests:</strong> assert the traceparent header itself, the exact rate-limit header sequence, zero embedding calls on the cache-hit path. Dashboards can lie; assertions can't.<br>
+  <strong>Shared contract package:</strong> cross-service drift is a types problem before it's an ops problem. One npm package, breaking changes gated behind majors.</p>
+</div>
+
+<h3>If you're a CTO or CAIO</h3>
+<div class="aside">
+  <span class="tag">What to demand from any platform like this</span>
+  <p><strong>Exit criteria as artifacts:</strong> every phase closed on written, test-mapped criteria, not vibes. Ask to see them.<br>
+  <strong>A risk register with reopen triggers:</strong> not "is it secure?" but "which risks are accepted, why, and what event reopens the decision?"<br>
+  <strong>Cost attribution per tenant per feature:</strong> if spend can't be attributed, unit economics are folklore.<br>
+  <strong>Adoption surface:</strong> can a team pull one package without swallowing the platform? Monoliths get evaluated; packages get adopted.<br>
+  <strong>The deviation log:</strong> a team that writes down what it cut, and when it would un-cut it, is a team you can trust with production.</p>
 </div>
 
 <h3>If you build AI systems yourself</h3>
@@ -690,16 +732,16 @@ sequenceDiagram
 
 <p><strong>Not load-proven at scale.</strong> Formal k6 profiles, 1k concurrent streams, webhook storms, are Phase 5. Today's performance claims come from targeted benchmarks with stated methodology, not sustained production traffic.</p>
 
-<p><strong>You operate it.</strong> This is self-hosted infrastructure. Single-node compose by default; retention, tuning, and pager duty are yours. Prometheus scrape targets are declared ahead of the services exposing metrics exporters, and the dashboards say so plainly.</p>
+<p><strong>You operate it.</strong> This is self-hosted infrastructure. Single-node compose by default; retention, tuning, and pager duty are yours. The Prometheus scrape targets declared in this repo were written ahead of the services exposing <code>/metrics</code> exporters, and the dashboards say so plainly.</p>
 
 <p><strong>Some plan features shipped as deviations.</strong> Background tasks replaced Celery workers. Native parsers replaced Unstructured. Eval scorers run in-process rather than as subprocesses. Each recorded with rationale. Deviation logs are how a project stays honest with its own roadmap.</p>
 
-<p><strong>And it's not done.</strong> Guardrails middleware, a full docs site, Helm charts, and v1.0 tags remain. That's not a disclaimer; it's the point. Infrastructure is never done. It just reaches the state where other people can safely stand on it.</p>
+<p><strong>And it's not done.</strong> Guardrails middleware, a full docs site, Helm charts, and v1.0 tags remained at the end of Phase 4. All five landed in the sequel, and the honest close-out of every one of them, including what stayed accepted rather than fixed, is in <a href="https://mailtotanvir.github.io/axiom-ai/blog/axiom-ai-phase5-hardening.html">The shift from AI toolkit to ecosystem</a>.</p>
 
 <footer>
   <span class="sig">End of transmission</span>
-  <p><strong>Axiom AI</strong> is Apache-2.0: five packages, 198 passing tests, eight ADRs, and one test file that will never let me forget the empty traceparent. The full evidence log, mapping every claim in this post to a named test, ships in the repository.</p>
-  <p style="margin-top:10px;">Part of Tanvir's agentic portfolio, alongside <a href="https://github.com/mailtotanvir/stratum">Stratum</a>, a local-first execution runtime where nothing executes without a human approval gate.</p>
+  <p><strong>Axiom AI</strong> is Apache-2.0: five packages, 198 passing tests at the end of Phase 4 (240 once Phase 5's hardening suites landed), eight ADRs then, ten now, and one test file that will never let me forget the empty traceparent. The full evidence log, mapping every claim in this post to a named test, ships in the repository.</p>
+  <p style="margin-top:10px;">Continue the story: <a href="https://mailtotanvir.github.io/axiom-ai/blog/axiom-ai-phase5-hardening.html">The shift from AI toolkit to ecosystem: lessons learned the hard way</a>, the Phase 5 hardening log. Part of Tanvir's agentic portfolio, alongside <a href="https://github.com/mailtotanvir/stratum">Stratum</a>, a local-first execution runtime where nothing executes without a human approval gate.</p>
 </footer>
 
 </article>
