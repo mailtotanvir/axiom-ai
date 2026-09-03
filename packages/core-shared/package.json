@@ -1,6 +1,6 @@
 {
   "name": "@tanvir1971/core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared contracts for Axiom AI: canonical types, configuration schemas, crypto signing, error taxonomy, and Protobuf definitions.",
   "license": "Apache-2.0",
   "type": "module",
