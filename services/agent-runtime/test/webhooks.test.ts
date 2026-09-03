@@ -9,6 +9,7 @@
 
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import type { Express } from "express";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -50,7 +51,7 @@ function makeJob(endpointUrl: string, overrides: Partial<WebhookDeliveryJob> = {
   };
 }
 
-async function listen(app: import("express").Express): Promise<string> {
+async function listen(app: Express): Promise<string> {
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;

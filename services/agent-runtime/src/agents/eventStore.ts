@@ -6,7 +6,7 @@
 
 import { Pool } from "pg";
 
-import type { RunEvent, RunEventType } from "./types.js";
+import type { RunEvent, RunEventType, RunState } from "./types.js";
 
 export interface RunEventStore {
   append(event: Omit<RunEvent, "seq"> & { seq?: number }): Promise<RunEvent>;
@@ -15,7 +15,7 @@ export interface RunEventStore {
 }
 
 export function deriveState(events: RunEvent[]): {
-  state: import("./types.js").RunState;
+  state: RunState;
   steps: number;
   tokensUsed: number;
   failureReason?: string;
@@ -23,7 +23,7 @@ export function deriveState(events: RunEvent[]): {
 } {
   let steps = 0;
   let tokensUsed = 0;
-  let state: import("./types.js").RunState = events.length > 0 ? "running" : "queued";
+  let state: RunState = events.length > 0 ? "running" : "queued";
   let failureReason: string | undefined;
   let output: string | undefined;
 

@@ -64,6 +64,7 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: "true"
+          limit-severities-for-sarif: true
           format: sarif
           output: trivy.sarif
       - name: Upload SARIF
