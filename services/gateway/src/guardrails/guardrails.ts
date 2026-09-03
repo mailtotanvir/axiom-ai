@@ -14,7 +14,7 @@ import {
   type ChatMessage,
   globalMetrics,
   type Counter,
-} from "@axiom-ai/core";
+} from "@tanvir1971/core";
 
 export interface GuardrailContext {
   tenantId: string;

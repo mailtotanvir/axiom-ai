@@ -11,7 +11,7 @@
  * caching without changing payloads.
  */
 
-import type { ChatCompletionRequest } from "@axiom-ai/core";
+import type { ChatCompletionRequest } from "@tanvir1971/core";
 
 import type { ProviderAdapter, ProviderId, UpstreamCall, UpstreamResult } from "./types.js";
 import { classifyFailure } from "./classify.js";

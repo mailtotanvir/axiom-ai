@@ -5,7 +5,7 @@ import {
   InputCache,
   stableStringify,
 } from "../src/cache/inputCache.js";
-import type { ChatCompletionRequest } from "@axiom-ai/core";
+import type { ChatCompletionRequest } from "@tanvir1971/core";
 
 function makeRequest(overrides: Partial<ChatCompletionRequest> = {}): ChatCompletionRequest {
   return {

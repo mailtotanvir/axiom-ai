@@ -10,17 +10,17 @@ install: ## Install TS workspaces + Python venv
 		.venv/bin/pip install -q -r requirements.txt -r requirements-dev.txt
 
 build: ## Compile all TypeScript services + core package
-	npm run build -w @axiom-ai/core -w @axiom-ai/gateway -w @axiom-ai/agent-runtime -w @axiom-ai/ops-observability
+	npm run build -w @tanvir1971/core -w @axiom-ai/gateway -w @axiom-ai/agent-runtime -w @axiom-ai/ops-observability
 
 lint: ## Lint TS (eslint) + Python (ruff)
-	npm run lint -w @axiom-ai/core -w @axiom-ai/gateway -w @axiom-ai/agent-runtime -w @axiom-ai/ops-observability
+	npm run lint -w @tanvir1971/core -w @axiom-ai/gateway -w @axiom-ai/agent-runtime -w @axiom-ai/ops-observability
 	cd services/rag-pipeline && .venv/bin/python -m ruff check app tests
 
 typecheck: ## TypeScript strict typecheck across workspaces
-	npm run typecheck -w @axiom-ai/core -w @axiom-ai/gateway -w @axiom-ai/agent-runtime -w @axiom-ai/ops-observability
+	npm run typecheck -w @tanvir1971/core -w @axiom-ai/gateway -w @axiom-ai/agent-runtime -w @axiom-ai/ops-observability
 
 test: ## Run all unit tests (vitest + pytest)
-	npm test -w @axiom-ai/core -w @axiom-ai/gateway -w @axiom-ai/agent-runtime -w @axiom-ai/ops-observability
+	npm test -w @tanvir1971/core -w @axiom-ai/gateway -w @axiom-ai/agent-runtime -w @axiom-ai/ops-observability
 	cd services/rag-pipeline && .venv/bin/python -m pytest -q
 
 up: ## Boot the full platform via docker compose

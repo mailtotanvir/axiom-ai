@@ -5,7 +5,7 @@
 
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import { errors } from "@axiom-ai/core";
+import { errors } from "@tanvir1971/core";
 
 import type { ApiKeyRecord, ApiKeyStore } from "./apiKeyStore.js";
 import { API_KEY_PREFIX } from "./apiKeyStore.js";

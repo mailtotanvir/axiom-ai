@@ -21,7 +21,7 @@ Verified numbers live in `docs/benchmarks/BENCHMARKS-v1.0.md`.
 ## Security
 
 - STRIDE threat models: `docs/security/`
-- Secret scrubbing enforced by the shared logger (`@axiom-ai/core` secrets module)
+- Secret scrubbing enforced by the shared logger (`@tanvir1971/core` secrets module)
 - CI: CodeQL, gitleaks, Trivy (filesystem + container images) in `.github/workflows/security.yml`
 
 ## Billing (developer mode)

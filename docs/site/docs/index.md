@@ -32,6 +32,6 @@ Grafana dashboards: <http://localhost:3001>. Prometheus: <http://localhost:9090>
 | `rag-pipeline` | Ingestion, hybrid retrieval, semantic cache, PII guardrails | 8000 |
 | `@axiom-ai/agent-runtime` | Step orchestrator, sandbox, signed webhooks, DLQ | 5000 |
 | `@axiom-ai/ops-observability` | Traces, prompt registry, evals, A/B, billing | 4000 |
-| `@axiom-ai/core` | Contracts, errors, HMAC, telemetry, metrics, secret scrubbing | - |
+| `@tanvir1971/core` | Contracts, errors, HMAC, telemetry, metrics, secret scrubbing | - |
 
 Use the section tabs for concepts, tutorials, API reference, and operations.

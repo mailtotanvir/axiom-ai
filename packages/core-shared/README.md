@@ -1,4 +1,4 @@
-# @axiom-ai/core
+# @tanvir1971/core
 
 Shared contracts for the Axiom AI platform: canonical TypeScript types, the
 environment configuration schema, HMAC payload signing, the error taxonomy,
@@ -11,13 +11,13 @@ contract in pydantic).
 ## Install
 
 ```bash
-npm install @axiom-ai/core
+npm install @tanvir1971/core
 ```
 
 ## Usage
 
 ```ts
-import { loadConfig, baseConfigSchema, errors, signPayload, verifySignature } from "@axiom-ai/core";
+import { loadConfig, baseConfigSchema, errors, signPayload, verifySignature } from "@tanvir1971/core";
 
 const config = loadConfig(baseConfigSchema.merge(myServiceSchema));
 ```

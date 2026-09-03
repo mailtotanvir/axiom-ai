@@ -6,7 +6,7 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { errors } from "@axiom-ai/core";
+import { errors } from "@tanvir1971/core";
 
 import type { TraceSearch, TraceStore } from "./store.js";
 import type { RetentionStore } from "../retention.js";

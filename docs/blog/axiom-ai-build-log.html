@@ -362,7 +362,7 @@ flowchart TD
 <details>
 <summary>The stack, precisely: what the gateway is actually built from</summary>
 <div class="inner">
-  <p><strong>Runtime:</strong> Node 20, TypeScript, Fastify 5 (chosen over Express for the gateway specifically because route-level hooks map cleanly onto the auth → validate → route pipeline, and Fastify's logger hooks are where the redaction engine attaches). <strong>State:</strong> ioredis for the sliding-window limiter and cache tier, <code>pg</code> for the hashed API-key store. <strong>Contracts:</strong> Zod schemas from <code>@axiom-ai/core</code> validate every wire body; a request that fails schema validation never reaches a provider adapter.</p>
+  <p><strong>Runtime:</strong> Node 20, TypeScript, Fastify 5 (chosen over Express for the gateway specifically because route-level hooks map cleanly onto the auth → validate → route pipeline, and Fastify's logger hooks are where the redaction engine attaches). <strong>State:</strong> ioredis for the sliding-window limiter and cache tier, <code>pg</code> for the hashed API-key store. <strong>Contracts:</strong> Zod schemas from <code>@tanvir1971/core</code> validate every wire body; a request that fails schema validation never reaches a provider adapter.</p>
   <p><strong>Provider layer:</strong> one <code>ProviderAdapter</code> interface with an <code>openaiCompatible.ts</code> implementation covering Groq, Mistral, Gemini's OpenAI-compat endpoint, SiliconFlow, and NVIDIA NIM, plus a dedicated Anthropic adapter for its differing wire format. A <code>classify.ts</code> module maps provider error classes to breaker decisions, so a 429 from one provider is not treated as a 500 from another. <strong>Streaming:</strong> <code>sse.ts</code> hijacks the raw socket for passthrough; <code>sseUsage.ts</code> parses usage deltas out of the stream for metering without buffering the whole completion.</p>
   <p><strong>Metering:</strong> async batched sink into ClickHouse, with a <code>reconciliation_delta</code> column comparing the estimate against provider-reported usage. The sink is deliberately off the request's critical path; the chaos suite proves the gateway survives ClickHouse being down entirely.</p>
 </div>
@@ -479,7 +479,7 @@ sequenceDiagram
 
 <p>Why does this matter? Because <strong>drift between services is a contracts problem before it's a deployment problem.</strong> Without the shared package, service A's "validation_failed" becomes service B's mystery 500. With it, breaking changes require a major version bump in public, with a changelog. It felt like overhead for about a week. Then it felt like gravity.</p>
 
-<pre><code>@axiom-ai/core
+<pre><code>@tanvir1971/core
 ├── types/       requests · chunks · usage · tenants · errors
 ├── config/      Zod schemas (startup fails fast, loudly)
 ├── crypto/      signPayload / verifySignature (one format everywhere)
@@ -512,10 +512,10 @@ sequenceDiagram
     <tr><td><code>axiom-rag-pipeline</code> :8000</td><td>Python / FastAPI + Pydantic v2</td><td>psycopg3, pypdf, httpx</td><td>Ingestion, chunking, embeddings, retrieval</td></tr>
     <tr><td><code>axiom-agent-runtime</code> :5000</td><td>TypeScript / Express 4</td><td>BullMQ 5, isolated-vm 7, pg</td><td>Event-sourced runs, sandboxed tools, webhooks</td></tr>
     <tr><td><code>axiom-ops-observability</code> :4000</td><td>TypeScript / Fastify 5</td><td>Prisma 6, Ajv, pg</td><td>Traces, prompt registry, evals, A/B stats, billing</td></tr>
-    <tr><td><code>@axiom-ai/core</code> (npm)</td><td>TypeScript</td><td>Zod, OTel SDK (@opentelemetry/sdk-trace-base), pg</td><td>Types, config schemas, HMAC crypto, telemetry, protobuf contracts</td></tr>
+    <tr><td><code>@tanvir1971/core</code> (npm)</td><td>TypeScript</td><td>Zod, OTel SDK (@opentelemetry/sdk-trace-base), pg</td><td>Types, config schemas, HMAC crypto, telemetry, protobuf contracts</td></tr>
   </tbody>
 </table>
-<p class="dim" style="font-size:14px;">Versions are pinned in each package manifest; the constraint that shaped this stack is that only <code>@axiom-ai/core</code> is published, so every shared dependency upgrade is a single semver-gated decision.</p>
+<p class="dim" style="font-size:14px;">Versions are pinned in each package manifest; the constraint that shaped this stack is that only <code>@tanvir1971/core</code> is published, so every shared dependency upgrade is a single semver-gated decision.</p>
 
 <div class="mermaid-frame"><div class="frame-bar"><span class="dot"></span><span class="t">system diagram</span><span class="live">rendered live</span></div>
 <div class="mermaid">

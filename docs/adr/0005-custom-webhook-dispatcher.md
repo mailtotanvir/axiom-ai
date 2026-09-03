@@ -9,7 +9,7 @@ Agent runs and ingestion jobs emit webhooks. The spec permits Svix or a custom i
 
 ## Decision
 
-Build a custom dispatcher on BullMQ: HMAC-SHA256 signatures via `@axiom-ai/core`, timestamped headers with replay protection, exponential backoff with jitter, dead-letter queue, replay CLI. Evaluate Svix post-v1 if endpoint-management UX demands grow.
+Build a custom dispatcher on BullMQ: HMAC-SHA256 signatures via `@tanvir1971/core`, timestamped headers with replay protection, exponential backoff with jitter, dead-letter queue, replay CLI. Evaluate Svix post-v1 if endpoint-management UX demands grow.
 
 ## Consequences
 

@@ -5,7 +5,7 @@ import { Redis } from "ioredis";
 import type { Redis as RedisClient } from "ioredis";
 import { z } from "zod";
 
-import { CORE_VERSION, errors, initTelemetry } from "@axiom-ai/core";
+import { CORE_VERSION, errors, initTelemetry } from "@tanvir1971/core";
 
 import { AgentOrchestrator } from "./agents/orchestrator.js";
 import { GatewayLlmClient, type LlmClient } from "./agents/llm.js";

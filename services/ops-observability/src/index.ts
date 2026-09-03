@@ -1,4 +1,4 @@
-import { CORE_VERSION } from "@axiom-ai/core";
+import { CORE_VERSION } from "@tanvir1971/core";
 
 import { buildApp, migrateRegistry } from "./app.js";
 import { createOpsConfig } from "./config.js";

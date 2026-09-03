@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
-import { CORE_VERSION } from "@axiom-ai/core";
+import { CORE_VERSION } from "@tanvir1971/core";
 
 interface HealthResponse {
   status: "ok";

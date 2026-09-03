@@ -8,7 +8,7 @@
 import type {
   ChatCompletionRequest,
   ProviderId,
-} from "@axiom-ai/core";
+} from "@tanvir1971/core";
 
 export type { ProviderId };
 

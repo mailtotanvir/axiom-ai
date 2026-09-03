@@ -4,7 +4,7 @@
  * providers that actually hold credentials at boot.
  */
 
-import type { ModelInfo, ProviderId } from "@axiom-ai/core";
+import type { ModelInfo, ProviderId } from "@tanvir1971/core";
 
 function entry(
   id: string,

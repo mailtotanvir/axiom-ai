@@ -5,7 +5,7 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { errors } from "@axiom-ai/core";
+import { errors } from "@tanvir1971/core";
 
 import type { EvalRunner } from "./runner.js";
 import type { EvalStore } from "./store.js";

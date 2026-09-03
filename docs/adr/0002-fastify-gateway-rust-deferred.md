@@ -6,7 +6,7 @@ Supersedes: none
 
 ## Context
 
-The spec allows Node.js (Fastify) or Rust (Axum) for `axiom-gateway`. Rust offers superior tail latency; TypeScript shares types and tooling with `@axiom-ai/core` and the other TS services.
+The spec allows Node.js (Fastify) or Rust (Axum) for `axiom-gateway`. Rust offers superior tail latency; TypeScript shares types and tooling with `@tanvir1971/core` and the other TS services.
 
 ## Decision
 

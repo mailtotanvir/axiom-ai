@@ -8,7 +8,7 @@
 
 import type { FastifyInstance, FastifyReply } from "fastify";
 
-import { errors } from "@axiom-ai/core";
+import { errors } from "@tanvir1971/core";
 
 import { diffLines, unifiedDiff } from "./diff.js";
 import { extractVariables, renderTemplate } from "./render.js";

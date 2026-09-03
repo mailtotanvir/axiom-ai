@@ -5,7 +5,7 @@ import {
   loadConfig,
   providerKeysSchema,
   serviceEndpointsSchema,
-} from "@axiom-ai/core";
+} from "@tanvir1971/core";
 
 import { tierLimitsSchema, DEFAULT_TIER_LIMITS, type TierLimit } from "./ratelimit/tierLimits.js";
 

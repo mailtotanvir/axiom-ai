@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type { ChatCompletionRequest } from "@axiom-ai/core";
+import type { ChatCompletionRequest } from "@tanvir1971/core";
 import {
   PresidioPiiGuardrail,
   ContentPolicyGuardrail,

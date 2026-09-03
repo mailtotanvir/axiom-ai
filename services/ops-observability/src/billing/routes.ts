@@ -1,6 +1,6 @@
 import { type FastifyInstance } from "fastify";
 
-import { errors } from "@axiom-ai/core";
+import { errors } from "@tanvir1971/core";
 
 import { type BillingSync, billingEnabled, type BillingConfig } from "./billing.js";
 

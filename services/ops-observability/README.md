@@ -68,4 +68,4 @@ npm test
 
 ## Configuration
 
-Shared env contract via `@axiom-ai/core`; see root [`.env.example`](../../.env.example).
+Shared env contract via `@tanvir1971/core`; see root [`.env.example`](../../.env.example).

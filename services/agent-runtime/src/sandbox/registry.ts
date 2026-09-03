@@ -7,7 +7,7 @@
 import { createHash } from "node:crypto";
 
 import type { ToolExecutionResult, ToolManifest } from "../agents/types.js";
-import { AxiomError } from "@axiom-ai/core";
+import { AxiomError } from "@tanvir1971/core";
 
 import type { SandboxExecutor } from "./types.js";
 

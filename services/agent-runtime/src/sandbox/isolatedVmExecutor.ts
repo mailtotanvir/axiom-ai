@@ -12,7 +12,7 @@
  */
 
 import ivm from "isolated-vm";
-import { globalMetrics, type Counter } from "@axiom-ai/core";
+import { globalMetrics, type Counter } from "@tanvir1971/core";
 
 import type { SandboxExecution, SandboxExecutor } from "./types.js";
 import type { ToolExecutionResult } from "../agents/types.js";

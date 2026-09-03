@@ -46,7 +46,7 @@ These resolve ambiguities in the spec. Each will be recorded formally as an ADR 
 | D3 | Sandbox | **isolated-vm** first, Wasmer/Wasm second track | isolated-vm is mature in Node; Wasm track validated in Phase 3 spike. Firecracker documented as production hard-isolation option. | Accepted |
 | D4 | Vector store | **Qdrant** as reference implementation behind a `VectorStore` interface; Pinecone adapter optional | Self-hostable = credible OSS story; interface keeps vendor choice open. | Accepted |
 | D5 | Webhooks | Custom dispatcher (HMAC-SHA256 signatures, exponential backoff, DLQ); Svix evaluated post-v1 | Zero external dependency for v1; spec allows either. | Accepted |
-| D6 | Shared library distribution | Public npm package `@axiom-ai/core`, versioned independently; protos are source of truth | Spec calls for private registry; OSS requires public. Breaking proto changes gated behind major versions. | Accepted |
+| D6 | Shared library distribution | Public npm package `@tanvir1971/core`, versioned independently; protos are source of truth | Spec calls for private registry; OSS requires public. Breaking proto changes gated behind major versions. | Accepted |
 | D7 | Inter-service transport | REST/SSE externally, **gRPC internally** per spec; gRPC gateway only where browser access needed | Matches spec §3; protos in `axiom-core-shared`. | Per spec |
 | D8 | Dev/test LLM providers | OpenAI-compatible adapters driven by env keys already in CI/dev: `GEMINI_API_KEY` (model `gemini-3.6-flash`), `GROQ_API_KEY`, `MISTRAL_API_KEY`, `SILICONFLOW_API_KEY`, `NVIDIA_NIM_API_KEY` | Enables real-model integration tests without OpenAI/Anthropic accounts; all listed providers expose OpenAI-compatible endpoints (Gemini has a compatibility shim). | Accepted |
 | D9 | Repo topology | Multi-repo at release; during build, all services live as directories inside this meta workspace (`services/*`, `packages/*`) so one clone builds everything; split into standalone repos + `axiom-meta` overlay at publish time | Approved overlay approach; keeps agentic iteration fast without violating the multi-repo contract model. | Accepted |
@@ -98,7 +98,7 @@ Epic IDs are stable references for issue tracking (`<repo-prefix><n>`): G=gatewa
   - `axiom-meta` (or this repo): root README, architecture diagram, ADR index, `docker-compose.dev.yml` spanning all services + Redis + Postgres + ClickHouse + Qdrant + Traefik.
   - Governance kit templated into every repo: `LICENSE` (Apache-2.0), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/CODEOWNERS`, issue/PR templates, `GOVERNANCE.md` (maintainership, RFC/ADR process).
 - **C2 — `axiom-core-shared` v0**
-  - Package `@axiom-ai/core`: canonical TS types (requests, chunks, usage, errors, tenants), Zod config schemas implementing the spec §5 key contract, HMAC signing utilities (`signPayload`/`verifySignature`), error taxonomy with codes used by all services.
+  - Package `@tanvir1971/core`: canonical TS types (requests, chunks, usage, errors, tenants), Zod config schemas implementing the spec §5 key contract, HMAC signing utilities (`signPayload`/`verifySignature`), error taxonomy with codes used by all services.
   - Proto directory `proto/axiom/v1/*.proto`: `gateway.proto`, `knowledge.proto`, `agent.proto`, `telemetry.proto`. Buf-managed (`buf.yaml`, breaking-change checks in CI).
   - Generated clients/servers stubs for TS and Python (grpcio-tools) committed via CI artifact.
 - **X1 — Repo scaffolds** matching spec §4 init scripts (Fastify/TS, FastAPI/pydantic, BullMQ/TS, OTel+Prisma/TS) with: TypeScript strict mode or ruff/mypy strictness, ESLint+Prettier, pytest/vitest, pre-commit hooks, Makefile/task runner, `.env.example`.
@@ -106,7 +106,7 @@ Epic IDs are stable references for issue tracking (`<repo-prefix><n>`): G=gatewa
 - **X3 — Local dev orchestration**: `make up` boots full stack; health-check script verifies all four services + dependencies; seeded demo data.
 - **X4 — Observability bootstrap**: shared OTel SDK config package; every service exports OTLP traces/spans/logs to a collector in compose from day one.
 
-**Exit criteria:** `make up && make smoke` passes on a clean machine; all repos green in CI; `@axiom-ai/core@0.1.0` on npm with protos consumed by at least one stub endpoint in each service.
+**Exit criteria:** `make up && make smoke` passes on a clean machine; all repos green in CI; `@tanvir1971/core@0.1.0` on npm with protos consumed by at least one stub endpoint in each service.
 
 ---
 
@@ -145,7 +145,7 @@ Epic IDs are stable references for issue tracking (`<repo-prefix><n>`): G=gatewa
 
 - **R1 — Ingestion service (Celery workers + Argo profile later)**
   - Upload API (multipart + presigned URLs), format parsers led by **Unstructured** (PDF/HTML/DOCX/Markdown/text), pluggable parser registry.
-  - Chunking strategies (fixed, recursive, sentence-window, layout-aware for PDFs) selected per-document-type; overlap + metadata envelope schema defined in `@axiom-ai/core`.
+  - Chunking strategies (fixed, recursive, sentence-window, layout-aware for PDFs) selected per-document-type; overlap + metadata envelope schema defined in `@tanvir1971/core`.
 - **R2 — Embedding & indexing**
   - Embedding provider abstraction (local `sentence-transformers` default for OSS credibility; hosted embeddings configurable), batch embedding with checkpoint/resume.
   - **Qdrant** multi-tenancy: collection-per-tenant-class with payload filters + mandatory tenant claim enforcement; namespace naming convention from JWT claims (spec §2 row 8).
@@ -182,7 +182,7 @@ Epic IDs are stable references for issue tracking (`<repo-prefix><n>`): G=gatewa
 - **A4 — Context assembly engine**
   - Token-budgeting algorithm (spec §2 row 13): system prompt + history + retrieved chunks packed to fit model window with priority ordering and truncation markers; session state in Redis; budget calculator unit-tested against all registered model windows.
 - **A5 — Webhook fan-out**
-  - HMAC-SHA256 signatures (`@axiom-ai/core` signing utils), timestamp headers + replay protection, exponential backoff with jitter, dead-letter queue + replay CLI, per-endpoint secrets rotation.
+  - HMAC-SHA256 signatures (`@tanvir1971/core` signing utils), timestamp headers + replay protection, exponential backoff with jitter, dead-letter queue + replay CLI, per-endpoint secrets rotation.
 - **A6 — Temporal evaluation**: **Deferred** to post-v1 backlog per review decision Q5 (D2). Revisit only if multi-step workflow durability demands outgrow BullMQ.
 
 **Exit criteria:** sandbox escape suite fully blocked with enforced CPU/memory caps; a killed worker resumes an in-flight agent run from last event; webhook receiver integration test proves exactly-once *observation* semantics over at-least-once delivery (dedup by signature/timestamp/idempotency key); DLQ replay restores delivery.
@@ -196,7 +196,7 @@ Epic IDs are stable references for issue tracking (`<repo-prefix><n>`): G=gatewa
 **Deliverables**
 
 - **O1 — Trace ingestion & storage**
-  - OTel collector → ClickHouse sink (spec: billions of immutable rows); LLM semantic-convention spans (prompt/completion/token/latency/cost attributes) standardized via `@axiom-ai/core` telemetry module; Jaeger-compatible query API; retention policies per tenant.
+  - OTel collector → ClickHouse sink (spec: billions of immutable rows); LLM semantic-convention spans (prompt/completion/token/latency/cost attributes) standardized via `@tanvir1971/core` telemetry module; Jaeger-compatible query API; retention policies per tenant.
 - **O2 — Prompt registry (Postgres + Prisma + Zod)**
   - Prompts as typed, versioned artifacts: template variables validated by JSON Schema, semver per prompt, environment promotion (dev→staging→prod), diff view API, immutability of published versions.
 - **O3 — Eval engine**
@@ -257,7 +257,7 @@ Epic IDs are stable references for issue tracking (`<repo-prefix><n>`): G=gatewa
 
 ### 6.3 Environments & configuration
 
-- Single source of truth: Zod schema in `@axiom-ai/core` mirroring spec §5 keys (`AXIOM_ENV`, `AXIOM_INTER_SERVICE_SECRET`, broker URLs, upstream keys, internal endpoints). Startup fails fast on missing/invalid config; `.env.example` kept in lockstep by CI check.
+- Single source of truth: Zod schema in `@tanvir1971/core` mirroring spec §5 keys (`AXIOM_ENV`, `AXIOM_INTER_SERVICE_SECRET`, broker URLs, upstream keys, internal endpoints). Startup fails fast on missing/invalid config; `.env.example` kept in lockstep by CI check.
 - Dev/test providers per D8 (`GEMINI_API_KEY`/`GEMINI_MODEL=gemini-3.6-flash`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, `SILICONFLOW_API_KEY`, `NVIDIA_NIM_API_KEY`). No real customer keys in CI.
 - Kubernetes: per-repo Helm charts; `axiom-meta` publishes an umbrella chart for all-in-one installs.
 
@@ -395,7 +395,7 @@ full event log persisted to Postgres. Evidence:
 |-----------|--------|
 | All repos scaffolded with governance kit, strict tooling, `.env.example`, Dockerfiles | Done — 4 services + core package, Apache-2.0 kit, ADRs 0001–0007 |
 | CI running per repo (lint → typecheck → test → build → image) | Done — matrix CI + buf lint + docker builds + release workflow w/ SBOM |
-| `@axiom-ai/core` v0 published with protos consumed by each service | Done locally as `@axiom-ai/core@0.1.0` via workspace link; npm publish deferred until org exists (D9/D12) — all 4 services consume types/config/errors/crypto/telemetry |
+| `@tanvir1971/core` v0 published with protos consumed by each service | Done locally as `@tanvir1971/core@0.1.0` via workspace link; npm publish deferred until org exists (D9/D12) — all 4 services consume types/config/errors/crypto/telemetry |
 | Local compose stack boots; `make up && make smoke` passes on a clean machine | Done — verified live: 8/8 checks (all healths, model catalog, retrieve stub, ClickHouse ping, Qdrant readiness); Traefik host routing matches spec §3 |
 
 **Deviations from plan:** ops service published on host port 14000 (container keeps spec port 4000) due to an unrelated local process holding 4000. Temporal spike already removed (D2). Test totals: 28 vitest + 5 pytest, ruff/mypy/eslint/tsc clean.

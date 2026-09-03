@@ -5,7 +5,7 @@
 
 import { Pool, type PoolClient } from "pg";
 
-import type { TenantContext } from "@axiom-ai/core";
+import type { TenantContext } from "@tanvir1971/core";
 
 import {
   generateApiKey,

@@ -36,7 +36,7 @@ make test        # unit + integration tests across all services
 
 - TypeScript: strict mode, ESM, no `any` without justification comment.
 - Python: typed functions, `ruff check` and `mypy` clean.
-- Every service must read configuration exclusively through the Zod/pydantic schema in `@axiom-ai/core` — never raw `process.env` at call sites.
+- Every service must read configuration exclusively through the Zod/pydantic schema in `@tanvir1971/core` — never raw `process.env` at call sites.
 - Never log secrets, API keys, or tenant payload content.
 
 ## Reporting bugs & security issues

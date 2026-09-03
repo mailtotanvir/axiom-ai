@@ -6,7 +6,7 @@
  */
 
 import type { ClickHouseClient } from "../clickhouse.js";
-import { axiomAttr } from "@axiom-ai/core";
+import { axiomAttr } from "@tanvir1971/core";
 
 /** Rows as materialized by the collector ClickHouse exporter. */
 interface OtelTraceRow {

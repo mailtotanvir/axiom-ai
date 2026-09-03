@@ -20,8 +20,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm run build -w @axiom-ai/core
-      - run: npm test -w @axiom-ai/core
+      - run: npm run build -w @tanvir1971/core
+      - run: npm test -w @tanvir1971/core
 
   ts-services:
     name: ${{ matrix.service }} (build · test)

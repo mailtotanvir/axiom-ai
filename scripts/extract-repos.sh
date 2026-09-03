@@ -6,7 +6,7 @@
 # service becomes its own repo. This script:
 #   1. copies the directory into a staging tree,
 #   2. injects the shared CI workflow, license, and .gitignore,
-#   3. rewrites the @axiom-ai/core dependency to a published semver,
+#   3. rewrites the @tanvir1971/core dependency to a published semver,
 #   4. creates a fresh git repo and pushes to the configured remote org.
 #
 # Usage:
@@ -67,7 +67,7 @@ extract_one() {
 
   # Rewrite workspace core dependency to the published version.
   if [[ -f "$dest/package.json" ]]; then
-    sed -i "s|\"@axiom-ai/core\": \"[^']*\"|\"@axiom-ai/core\": \"^$CORE_VERSION\"|" "$dest/package.json"
+    sed -i "s|\"@tanvir1971/core\": \"[^']*\"|\"@tanvir1971/core\": \"^$CORE_VERSION\"|" "$dest/package.json"
   fi
 
   if [[ "$DRY_RUN" == true ]]; then

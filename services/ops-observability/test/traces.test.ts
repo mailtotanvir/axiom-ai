@@ -23,7 +23,7 @@ function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     SpanKind: 3,
     ServiceName: "axiom-gateway",
     ResourceAttributes: { "service.name": "axiom-gateway", deployment: "compose" },
-    ScopeName: "@axiom-ai/core",
+    ScopeName: "@tanvir1971/core",
     ScopeVersion: "0.2.0",
     SpanAttributes: {
       "gen_ai.system": "groq",

@@ -1,7 +1,7 @@
 # Shared multi-stage build for the TypeScript Axiom AI services.
 #
 # Build from the repository ROOT so the workspace lockfile resolves
-# @axiom-ai/core from source:
+# @tanvir1971/core from source:
 #
 #   docker build -f deploy/docker/service.Dockerfile \
 #     --build-arg SERVICE_WORKSPACE=@axiom-ai/gateway \
@@ -25,7 +25,7 @@ RUN npm ci --no-audit --no-fund
 COPY tsconfig.base.json ./
 COPY packages/core-shared packages/core-shared
 COPY services/${SERVICE_DIR} services/${SERVICE_DIR}
-RUN npm run build -w @axiom-ai/core -w "${SERVICE_WORKSPACE}"
+RUN npm run build -w @tanvir1971/core -w "${SERVICE_WORKSPACE}"
 
 FROM node:${NODE_VERSION} AS runtime
 ARG SERVICE_WORKSPACE

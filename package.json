@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Axiom AI development workspace overlay (ADR 0007): builds all TS services together; each directory is extracted into its own repository at release.",
   "license": "Apache-2.0",
-  "privateWorkspacesNote": "packages/core-shared is published to npm as @axiom-ai/core; services are private",
+  "privateWorkspacesNote": "packages/core-shared is published to npm as @tanvir1971/core; services are private",
   "workspaces": [
     "packages/*",
     "services/gateway",

@@ -5,7 +5,7 @@
  * (ADR 0006). Handles camelCase (unified) ↔ snake_case (wire) translation.
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse, TokenUsage } from "@axiom-ai/core";
+import type { ChatCompletionRequest, ChatCompletionResponse, TokenUsage } from "@tanvir1971/core";
 
 import { classifyFailure, type UpstreamFailureClassification } from "./classify.js";
 import type { ProviderAdapter, ProviderId, UpstreamCall, UpstreamResult } from "./types.js";

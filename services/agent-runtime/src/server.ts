@@ -7,7 +7,7 @@ import {
   globalMetrics,
   SIGNATURE_HEADER,
   verifySignature,
-} from "@axiom-ai/core";
+} from "@tanvir1971/core";
 
 export const queueDepthGauge = globalMetrics.registerGauge(
   "agent_runtime_queue_depth",

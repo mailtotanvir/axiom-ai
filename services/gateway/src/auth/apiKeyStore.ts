@@ -6,7 +6,7 @@
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
-import type { TenantContext } from "@axiom-ai/core";
+import type { TenantContext } from "@tanvir1971/core";
 
 export interface ApiKeyRecord extends TenantContext {
   keyHash: string;

@@ -9,7 +9,7 @@ import {
   globalMetrics,
   initTelemetry,
   type TelemetryHandle,
-} from "@axiom-ai/core";
+} from "@tanvir1971/core";
 
 import type { GatewayConfig } from "./config.js";
 import { buildRuntime, seedDevKeyIfMemoryStore, type GatewayRuntime } from "./runtime.js";

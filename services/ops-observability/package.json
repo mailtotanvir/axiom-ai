@@ -19,7 +19,7 @@
     "eval-gate": "tsx src/evals/gateCli.ts"
   },
   "dependencies": {
-    "@axiom-ai/core": "^1.0.0",
+    "@tanvir1971/core": "^1.0.0",
     "@prisma/client": "^6.19.3",
     "@types/pg": "^8.23.1",
     "ajv": "^8.20.0",

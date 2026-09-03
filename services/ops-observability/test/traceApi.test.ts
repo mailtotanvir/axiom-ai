@@ -30,7 +30,7 @@ class FakeClickHouse implements ClickHouseClient {
           SpanKind: 3,
           ServiceName: "axiom-gateway",
           ResourceAttributes: {},
-          ScopeName: "@axiom-ai/core",
+          ScopeName: "@tanvir1971/core",
           ScopeVersion: "0.2.0",
           SpanAttributes: { "axiom.tenant.id": "tenant-a" },
           Duration: 2000000,

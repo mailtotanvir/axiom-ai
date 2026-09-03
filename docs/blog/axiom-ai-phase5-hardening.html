@@ -419,7 +419,7 @@
 <!-- ========== CH 2 ========== -->
 <h2 id="secrets"><span class="chap">Chapter Two</span>The log that could have cost me everything</h2>
 
-<p>The fix for the secret-leak problem is one module: <code>secrets.ts</code> in <code>@axiom-ai/core</code>. It is the smallest file in the platform and the one I would defend hardest in a design review. The idea: redaction happens at the last possible moment, in the logger itself, so that no amount of carelessness upstream can put a credential on disk.</p>
+<p>The fix for the secret-leak problem is one module: <code>secrets.ts</code> in <code>@tanvir1971/core</code>. It is the smallest file in the platform and the one I would defend hardest in a design review. The idea: redaction happens at the last possible moment, in the logger itself, so that no amount of carelessness upstream can put a credential on disk.</p>
 
 <p>Three layers, one engine:</p>
 
@@ -517,7 +517,7 @@ flowchart LR
   <thead><tr><th>Capability</th><th>Stack</th><th>The pattern doing the work</th><th>Verified by</th></tr></thead>
   <tbody>
     <tr><td>Gateway / metrics</td><td>Node 20, Fastify 5, ioredis, pg</td><td>Decorator-based route registration; <code>/metrics</code> exposed per service via Prometheus text format on the internal network only</td><td>CI smoke + scrape checks</td></tr>
-    <tr><td>Secret scrubbing</td><td><code>@axiom-ai/core</code> (Zod 3, OTel SDK base)</td><td>Three-layer scrubber: sensitive key names, serialized header objects, credential-shaped value regexes</td><td>16 redaction tests failing the build</td></tr>
+    <tr><td>Secret scrubbing</td><td><code>@tanvir1971/core</code> (Zod 3, OTel SDK base)</td><td>Three-layer scrubber: sensitive key names, serialized header objects, credential-shaped value regexes</td><td>16 redaction tests failing the build</td></tr>
     <tr><td>RAG pipeline</td><td>Python 3, FastAPI, Pydantic v2, pypdf, psycopg3 pool</td><td>Tenant scope derived from verified JWT claims and applied as a mandatory filter at the data layer, never as a caller-supplied parameter</td><td>Nine red-team tenancy tests, fail-closed</td></tr>
     <tr><td>Agent runtime</td><td>Node 20, BullMQ 5, isolated-vm 7, Express 4, pg</td><td>Event-sourced runs: append-only <code>run_events</code> in Postgres, replay resumes after the last completed step, idempotency keys on every tool call</td><td>Kill-the-worker-mid-run test</td></tr>
     <tr><td>Ops plane</td><td>Fastify 5, Prisma 6, Ajv</td><td>Stripe sync behind a default-off flag; <code>set</code>-semantics usage records anchored to <code>axiom-{tenant}-{period}</code> idempotency keys</td><td>8 dry, deterministic billing tests</td></tr>
@@ -527,7 +527,7 @@ flowchart LR
 <details>
 <summary>Why the same logger contract across TypeScript and Python services?</summary>
 <div class="inner">
-  <p>The TS services share the scrubber via <code>@axiom-ai/core</code>. The RAG pipeline is Python (FastAPI/Pydantic), so it cannot import the module. Instead the contract is enforced structurally: Pydantic models forbid credential-shaped fields in log payloads, and the security workflow (gitleaks, Trivy, CodeQL in <code>.github/workflows/security.yml</code>) scans every language. A cross-language contract cannot be a shared library; it has to be a shared CI gate. That is the pattern I would keep at any team size.</p>
+  <p>The TS services share the scrubber via <code>@tanvir1971/core</code>. The RAG pipeline is Python (FastAPI/Pydantic), so it cannot import the module. Instead the contract is enforced structurally: Pydantic models forbid credential-shaped fields in log payloads, and the security workflow (gitleaks, Trivy, CodeQL in <code>.github/workflows/security.yml</code>) scans every language. A cross-language contract cannot be a shared library; it has to be a shared CI gate. That is the pattern I would keep at any team size.</p>
 </div>
 </details>
 
@@ -664,7 +664,7 @@ flowchart LR
   </div>
 </div>
 
-<p>It held, because of a rule enforced the entire build: <span class="lead-in">services never import each other, only <code>@axiom-ai/core</code>.</span> That single constraint is what makes the split mechanical instead of surgical. The extraction script (<code>scripts/extract-repos.sh</code>) stages all five repos in seconds: copies the directory, injects shared CI and license, rewrites <code>@axiom-ai/core</code> from a workspace link to <code>^1.0.0</code>, and prepares a fresh git history per repo. Cross-cutting assets (compose stacks, docs, ADRs) go to a sixth repo, <code>axiom-meta</code>.</p>
+<p>It held, because of a rule enforced the entire build: <span class="lead-in">services never import each other, only <code>@tanvir1971/core</code>.</span> That single constraint is what makes the split mechanical instead of surgical. The extraction script (<code>scripts/extract-repos.sh</code>) stages all five repos in seconds: copies the directory, injects shared CI and license, rewrites <code>@tanvir1971/core</code> from a workspace link to <code>^1.0.0</code>, and prepares a fresh git history per repo. Cross-cutting assets (compose stacks, docs, ADRs) go to a sixth repo, <code>axiom-meta</code>.</p>
 
 <p>Then the release pipeline. One tag, <code>v1.0.0</code>, and a workflow does the rest, in order, gated:</p>
 
@@ -684,14 +684,14 @@ sequenceDiagram
         GH-->>W: ghcr.io/...:1.0.0 published
     and npm package
         W->>N: verify tag == package.json, then publish
-        N-->>W: @axiom-ai/core@1.0.0 live
+        N-->>W: @tanvir1971/core@1.0.0 live
     end
     W->>W: GitHub release with generated notes
 </div></div>
 
 <p>Two details worth stealing for your own release. First, the npm job refuses to publish unless the tag matches <code>package.json</code> exactly; version drift between the tag and the artifact is how phantom releases happen. Second, the multi-arch build builds amd64 natively and arm64 through QEMU, which is slow for the Python image, so buildx caching is scoped per service to keep the second tag push cheap.</p>
 
-<p>Why this matters commercially, not just technically: extraction is what lets someone adopt the gateway without swallowing the whole platform. A team with their own RAG layer can pull one image. A startup can pin <code>@axiom-ai/core</code> and build their own services on the same contracts. <span class="lead-in">Monoliths get evaluated. Packages get adopted.</span></p>
+<p>Why this matters commercially, not just technically: extraction is what lets someone adopt the gateway without swallowing the whole platform. A team with their own RAG layer can pull one image. A startup can pin <code>@tanvir1971/core</code> and build their own services on the same contracts. <span class="lead-in">Monoliths get evaluated. Packages get adopted.</span></p>
 
 <div class="chapter-end">· · ·</div>
 

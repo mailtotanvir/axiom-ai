@@ -16,7 +16,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import type { ProviderAdapter, UpstreamResult } from "../providers/types.js";
-import type { ChatCompletionRequest, TenantContext } from "@axiom-ai/core";
+import type { ChatCompletionRequest, TenantContext } from "@tanvir1971/core";
 import {
   AxiomError,
   axiomAttr,
@@ -25,7 +25,7 @@ import {
   otel,
   withLlmSpan,
   type LlmCallOutcome,
-} from "@axiom-ai/core";
+} from "@tanvir1971/core";
 
 import type { GatewayRuntime } from "../runtime.js";
 import { resolveTenant } from "../auth/middleware.js";

@@ -1,7 +1,7 @@
 name: Release
 
 # Milestone 5.6: on a v* tag, build multi-arch images, push to GHCR,
-# and publish @axiom-ai/core to npm.
+# and publish @tanvir1971/core to npm.
 
 on:
   push:
@@ -27,8 +27,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm run build -w @axiom-ai/core
-      - run: npm test -w @axiom-ai/core
+      - run: npm run build -w @tanvir1971/core
+      - run: npm test -w @tanvir1971/core
       - run: npm test -w @axiom-ai/gateway
       - run: npm test -w @axiom-ai/agent-runtime
       - run: npm test -w @axiom-ai/ops-observability
@@ -87,7 +87,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
 
   npm-core:
-    name: Publish @axiom-ai/core to npm
+    name: Publish @tanvir1971/core to npm
     runs-on: ubuntu-latest
     needs: verify
     if: startsWith(github.ref, 'refs/tags/v')
@@ -100,7 +100,7 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci --no-audit --no-fund
-      - run: npm run build -w @axiom-ai/core
+      - run: npm run build -w @tanvir1971/core
       - name: Verify version matches tag
         run: |
           PKG_VERSION="v$(node -p "require('./packages/core-shared/package.json').version")"
@@ -108,7 +108,7 @@ jobs:
             echo "tag ${GITHUB_REF_NAME} does not match package version $PKG_VERSION"
             exit 1
           fi
-      - run: npm publish --access public -w @axiom-ai/core
+      - run: npm publish --access public -w @tanvir1971/core
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

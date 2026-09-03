@@ -13,7 +13,7 @@ import {
   errors,
   globalMetrics,
   initTelemetry,
-} from "@axiom-ai/core";
+} from "@tanvir1971/core";
 import { PrismaClient } from "@prisma/client";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

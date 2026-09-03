@@ -13,7 +13,7 @@
 import { Tiktoken } from "js-tiktoken/lite";
 import o200k_base from "js-tiktoken/ranks/o200k_base";
 
-import type { ChatCompletionRequest, ModelInfo, ProviderId } from "@axiom-ai/core";
+import type { ChatCompletionRequest, ModelInfo, ProviderId } from "@tanvir1971/core";
 
 const ENCODER = new Tiktoken(o200k_base);
 

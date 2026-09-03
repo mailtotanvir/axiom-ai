@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { InMemoryRateLimiter } from "../src/ratelimit/rateLimiter.js";
-import type { TenantContext } from "@axiom-ai/core";
+import type { TenantContext } from "@tanvir1971/core";
 import { estimateTokens, estimatePromptTokens, resolveUsage } from "../src/metering/usage.js";
 
 const LIMITS = {

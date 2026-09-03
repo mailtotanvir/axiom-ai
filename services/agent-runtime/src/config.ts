@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { baseConfigSchema, loadConfig, serviceEndpointsSchema } from "@axiom-ai/core";
+import { baseConfigSchema, loadConfig, serviceEndpointsSchema } from "@tanvir1971/core";
 
 export const agentRuntimeConfigSchema = baseConfigSchema
   .merge(serviceEndpointsSchema)

@@ -31,7 +31,7 @@ flowchart LR
 - **Ops plane** owns truth: trace queries, prompt registry with semver,
   eval engine, A/B experiments, and developer-mode billing.
 
-`@axiom-ai/core` carries the Zod schemas, error taxonomy, HMAC signing,
+`@tanvir1971/core` carries the Zod schemas, error taxonomy, HMAC signing,
 telemetry SDK, metrics, and the secret-scrubbing logger every service shares.
 
 Cross-service correlation uses W3C trace context: one `axiom.request.id`

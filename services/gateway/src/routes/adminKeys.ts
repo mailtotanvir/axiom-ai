@@ -6,7 +6,7 @@
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 
-import { errors } from "@axiom-ai/core";
+import { errors } from "@tanvir1971/core";
 
 import { requireInternalSecret } from "../auth/middleware.js";
 import type { ApiKeyStore } from "../auth/apiKeyStore.js";

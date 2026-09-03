@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 
 import type { Redis as RedisClient } from "ioredis";
 
-import type { ChatCompletionRequest } from "@axiom-ai/core";
+import type { ChatCompletionRequest } from "@tanvir1971/core";
 
 export interface InputCacheOptions {
   enabled: boolean;

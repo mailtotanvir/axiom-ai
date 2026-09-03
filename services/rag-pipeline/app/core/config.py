@@ -1,6 +1,6 @@
 """Configuration contract for the RAG pipeline.
 
-Mirrors the shared environment contract enforced by @axiom-ai/core (spec
+Mirrors the shared environment contract enforced by @tanvir1971/core (spec
 section 5). Services must never read os.environ at call sites; everything
 flows through Settings.
 """

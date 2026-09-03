@@ -5,7 +5,7 @@ import {
   mapRequestToAnthropic,
   mapToOpenAiWire,
 } from "../src/providers/anthropic.js";
-import type { ModelInfo } from "@axiom-ai/core";
+import type { ModelInfo } from "@tanvir1971/core";
 
 const ENTRY: ModelInfo = {
   id: "m",

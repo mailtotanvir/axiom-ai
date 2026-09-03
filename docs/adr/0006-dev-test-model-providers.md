@@ -13,4 +13,4 @@ All provider adapters speak the OpenAI-compatible chat-completions wire format. 
 
 ## Consequences
 
-Zero spend in CI. Provider drift is contained inside adapters; capability metadata (context window, cost) lives centrally in `@axiom-ai/core`.
+Zero spend in CI. Provider drift is contained inside adapters; capability metadata (context window, cost) lives centrally in `@tanvir1971/core`.

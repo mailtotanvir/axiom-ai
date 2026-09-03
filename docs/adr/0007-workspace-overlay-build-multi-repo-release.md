@@ -13,4 +13,4 @@ Develop everything in this workspace under `packages/` and `services/`, with eac
 
 ## Consequences
 
-One clone builds and smokes the whole platform today. CI workflows are written per-service so extraction is mechanical. Root npm workspaces are a build convenience only — packages never import across service boundaries except via `@axiom-ai/core`.
+One clone builds and smokes the whole platform today. CI workflows are written per-service so extraction is mechanical. Root npm workspaces are a build convenience only — packages never import across service boundaries except via `@tanvir1971/core`.

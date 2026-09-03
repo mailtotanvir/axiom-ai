@@ -7,7 +7,7 @@
  * follows agent runs across services.
  */
 
-import { llmAttr, otel, withLlmSpan, type Tracer } from "@axiom-ai/core";
+import { llmAttr, otel, withLlmSpan, type Tracer } from "@tanvir1971/core";
 
 export interface PlannerTurn {
   text: string;

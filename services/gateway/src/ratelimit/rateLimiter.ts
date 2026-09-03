@@ -9,7 +9,7 @@
 
 import type { Redis } from "ioredis";
 
-import type { TenantContext } from "@axiom-ai/core";
+import type { TenantContext } from "@tanvir1971/core";
 
 import type { TierLimit } from "./tierLimits.js";
 

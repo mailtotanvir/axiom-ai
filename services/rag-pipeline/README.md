@@ -64,7 +64,7 @@ Postgres, and Qdrant automatically).
 ## Configuration
 
 Mirrors the platform env contract (see root [`.env.example`](../../.env.example));
-production requires a 32+ char inter-service secret, same as `@axiom-ai/core`.
+production requires a 32+ char inter-service secret, same as `@tanvir1971/core`.
 Notables:
 
 | Variable | Default | Notes |

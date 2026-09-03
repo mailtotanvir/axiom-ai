@@ -10,7 +10,7 @@ command to re-run. Dates are execution dates; commit SHAs pin the code state.
 | Date | Suite | Command | Result | Commit |
 |------|-------|---------|--------|--------|
 | 2026-08-24 | Gateway unit + E2E (vitest) | `npx vitest run --root services/gateway` | **50 passed / 10 skipped** (live-gated) | `59e559b`+ |
-| 2026-08-24 | core-shared (vitest) | `npm test -w @axiom-ai/core` | **18 passed** | — |
+| 2026-08-24 | core-shared (vitest) | `npm test -w @tanvir1971/core` | **18 passed** | — |
 | 2026-08-24 | agent-runtime scaffold (vitest) | `npm test -w @axiom-ai/agent-runtime` | **3 passed** | — |
 | 2026-08-24 | ops-observability (vitest) | `npm test -w @axiom-ai/ops-observability` | **2 passed** | — |
 | 2026-08-25 | rag-pipeline (pytest) | `.venv/bin/python -m pytest -q` | **43 passed** | — |
@@ -29,7 +29,7 @@ Skipped tests are the live provider contracts, gated by
 |-----------|----------|
 | All repos scaffolded with governance kit, strict tooling | Apache-2.0 kit + ADRs 0001–0007 in repo (`be56606`); ruff/mypy/eslint/tsc clean |
 | CI running per service | `.github/workflows/ci.yml` matrix (build/test/lint/buf/docker) + release workflow w/ SBOM |
-| `@axiom-ai/core` consumed by all services | Workspace-linked `@axiom-ai/core`; types/config/errors/crypto/telemetry imported by all TS services; pydantic mirror in rag-pipeline |
+| `@tanvir1971/core` consumed by all services | Workspace-linked `@tanvir1971/core`; types/config/errors/crypto/telemetry imported by all TS services; pydantic mirror in rag-pipeline |
 | `make up && make smoke` on clean machine | Smoke 8/8: gateway/rag/agent/ops healths, model catalog, retrieve stub, ClickHouse ping, Qdrant readiness |
 
 ## Phase 1 — Gateway MVP (exit 2026-08-24)

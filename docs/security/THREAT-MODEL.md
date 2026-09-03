@@ -36,12 +36,12 @@ service trusts an incoming tenant claim without JWT verification.
 | Spoofing | JWT (RS256) tenant identity on every request; HMAC-SHA256 signatures on webhooks and inter-service callbacks |
 | Tampering | Signed webhook payloads with timestamp + replay window; Zod/Pydantic schema validation at every ingress; immutable append-only run/event logs |
 | Repudiation | Event-sourced run logs and ClickHouse metering keyed by `axiom.request.id`; W3C trace context propagates one trace id across all services |
-| Information disclosure | Secret-scrubbing (`createSafeLogger`, `scrubObject`, `scrubSpanAttribute` in `@axiom-ai/core`) applied to stdout logs and OTel span attributes; tenant isolation filters in Qdrant and SQL |
+| Information disclosure | Secret-scrubbing (`createSafeLogger`, `scrubObject`, `scrubSpanAttribute` in `@tanvir1971/core`) applied to stdout logs and OTel span attributes; tenant isolation filters in Qdrant and SQL |
 | Denial of service | Sliding-window rate limiter, circuit breaker failover chains, BullMQ queue caps, sandbox CPU/memory hard limits |
 | Elevation of privilege | `isolated-vm` sandbox with no host bindings; structural (JWT-derived, not client-supplied) tenant scoping in RAG; Prometheus endpoints bind internal network only |
 
 Secret handling: provider API keys exist only in service env vars. The
-`secrets.ts` module in `@axiom-ai/core` redacts `authorization`, `x-api-key`,
+`secrets.ts` module in `@tanvir1971/core` redacts `authorization`, `x-api-key`,
 `x-axiom-signature`, cookie, and credential-shaped values (bearer tokens,
 `sk-`, `gsk_`, `AKIA`, `sha256=`, Stripe, PEM blocks) from anything written to
 stdout or attached to a span. CI enforces this with the logger redaction test

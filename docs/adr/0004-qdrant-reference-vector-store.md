@@ -9,7 +9,7 @@ The spec allows Qdrant or Pinecone. A credible open-source platform should be se
 
 ## Decision
 
-Define a `VectorStore` interface in `@axiom-ai/core` (upsert, search with mandatory tenant filter, delete-by-document) and implement Qdrant first. Multi-tenancy uses payload filtering enforced server-side from verified JWT claims — callers can never supply tenant filters directly.
+Define a `VectorStore` interface in `@tanvir1971/core` (upsert, search with mandatory tenant filter, delete-by-document) and implement Qdrant first. Multi-tenancy uses payload filtering enforced server-side from verified JWT claims — callers can never supply tenant filters directly.
 
 ## Consequences
 

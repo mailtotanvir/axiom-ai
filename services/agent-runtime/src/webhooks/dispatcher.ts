@@ -1,6 +1,6 @@
 /**
  * Webhook fan-out (A5). Deliveries are signed (HMAC-SHA256 via
- * @axiom-ai/core), retried with exponential backoff + jitter over BullMQ,
+ * @tanvir1971/core), retried with exponential backoff + jitter over BullMQ,
  * and dead-lettered after the final attempt for operator replay.
  *
  * Delivery semantics: at-least-once. Receivers dedupe on the
@@ -9,7 +9,7 @@
 
 import type { Redis as RedisClient } from "ioredis";
 
-import { signPayload, SIGNATURE_HEADER } from "@axiom-ai/core";
+import { signPayload, SIGNATURE_HEADER } from "@tanvir1971/core";
 
 import { QUEUE_NAMES } from "../queues.js";
 

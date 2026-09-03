@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { ProviderId } from "@axiom-ai/core";
+import type { ProviderId } from "@tanvir1971/core";
 
 import type { ProviderAdapter } from "../src/providers/types.js";
 

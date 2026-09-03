@@ -1,6 +1,6 @@
 import "fastify";
 
-import type { TelemetryHandle } from "@axiom-ai/core";
+import type { TelemetryHandle } from "@tanvir1971/core";
 
 declare module "fastify" {
   interface FastifyInstance {
