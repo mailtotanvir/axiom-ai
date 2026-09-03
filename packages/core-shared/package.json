@@ -13,8 +13,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "proto",
+    "README.md",
+    "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src test",
@@ -43,7 +49,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mailtotanvir/axiom-core-shared.git"
+    "url": "git+https://github.com/axiom-ai/axiom-core-shared.git"
   },
   "keywords": [
     "llm",

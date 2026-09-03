@@ -1,6 +1,7 @@
 {
   "name": "@axiom-ai/ops-observability",
   "version": "0.1.0",
+  "private": true,
   "description": "Axiom AI control plane: LLM tracing, evaluation engine, prompt registry.",
   "license": "Apache-2.0",
   "type": "module",
@@ -18,7 +19,7 @@
     "eval-gate": "tsx src/evals/gateCli.ts"
   },
   "dependencies": {
-    "@axiom-ai/core": "^0.2.0",
+    "@axiom-ai/core": "^1.0.0",
     "@prisma/client": "^6.19.3",
     "@types/pg": "^8.23.1",
     "ajv": "^8.20.0",

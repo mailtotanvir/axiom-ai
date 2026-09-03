@@ -1,6 +1,7 @@
 {
   "name": "@axiom-ai/gateway",
   "version": "0.1.0",
+  "private": true,
   "description": "Axiom AI LLM gateway and proxy: routing, auth, rate-limiting, metering, streaming.",
   "license": "Apache-2.0",
   "type": "module",
@@ -14,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@axiom-ai/core": "^0.2.0",
+    "@axiom-ai/core": "^1.0.0",
     "fastify": "^5.2.1",
     "ioredis": "^5.11.1",
     "js-tiktoken": "^1.0.21",
