@@ -32,3 +32,6 @@ coverage/
 
 # Generated
 packages/*/src/generated/proto/
+
+# Local docs
+docs/PUBLISHING-NPM.md
