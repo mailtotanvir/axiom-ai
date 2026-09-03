@@ -27,7 +27,7 @@ message ChunkingOptions {
   uint32 overlap_tokens = 3;
 }
 
-message IngestStatus {
+message IngestDocumentResponse {
   string document_id = 1;
   string state = 2; // "queued" | "parsing" | "chunking" | "embedding" | "indexed" | "failed"
   uint32 chunks_indexed = 3;
@@ -57,6 +57,6 @@ message RetrieveResponse {
 }
 
 service KnowledgeService {
-  rpc IngestDocument(IngestDocumentRequest) returns (stream IngestStatus);
+  rpc IngestDocument(IngestDocumentRequest) returns (stream IngestDocumentResponse);
   rpc Retrieve(RetrieveRequest) returns (RetrieveResponse);
 }

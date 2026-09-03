@@ -7,9 +7,16 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Mapping
-from typing import ClassVar
+from typing import ClassVar, TypedDict
 
 Labels = Mapping[str, object]
+
+
+class _HistogramState(TypedDict):
+    count: int
+    sum: float
+    buckets: list[int]
+    labels: Labels | None
 
 
 def _format_labels(labels: Labels | None) -> str:
@@ -124,7 +131,7 @@ class Histogram:
         self.help_text = help_text
         self.buckets = tuple(sorted(buckets))
         self._lock = threading.Lock()
-        self._states: dict[str, dict[str, object]] = {}
+        self._states: dict[str, _HistogramState] = {}
 
     def observe(self, value: float, labels: Labels | None = None) -> None:
         key = _labels_key(labels)
@@ -139,8 +146,8 @@ class Histogram:
                 }
                 self._states[key] = state
 
-            state["count"] = int(state["count"]) + 1  # type: ignore[index]
-            state["sum"] = float(state["sum"]) + value  # type: ignore[index]
+            state["count"] = state["count"] + 1
+            state["sum"] = state["sum"] + value
             bucket_counts = state["buckets"]
             assert isinstance(bucket_counts, list)
             for i, bound in enumerate(self.buckets):

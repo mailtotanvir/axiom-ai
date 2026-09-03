@@ -146,7 +146,7 @@ def create_app(
         duration = time.perf_counter() - start_time
         route = request.url.path
         record_request(request.method, route, response.status_code, duration)
-        return response  # type: ignore[return-value]
+        return response
 
     @built.get("/metrics")
     async def metrics_endpoint() -> StarletteResponse:

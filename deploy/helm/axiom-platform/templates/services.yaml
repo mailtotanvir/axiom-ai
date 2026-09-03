@@ -27,10 +27,25 @@ spec:
         prometheus.io/port: "{{ $svc.port }}"
         prometheus.io/path: /metrics
     spec:
+      # Hardened defaults: images already run as non-root (node / nobody).
+      # runAsUser is deliberately unset so each image keeps its own UID.
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: service
           image: "{{ $.Values.global.imageRegistry }}/{{ $svc.image }}:{{ $svc.tag }}"
           imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           ports:
             - containerPort: {{ $svc.port }}
           readinessProbe:
@@ -45,9 +60,19 @@ spec:
             initialDelaySeconds: 10
           resources:
             {{- toYaml $svc.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
           env:
             - name: AXIOM_ENV
               value: {{ $.Values.global.axiomsEnv | quote }}
+            {{- if eq $name "ragPipeline" }}
+            # Writable homes for model caches under the read-only root FS.
+            - name: HF_HOME
+              value: /tmp/hf-cache
+            - name: TMPDIR
+              value: /tmp
+            {{- end }}
             {{- if $.Values.global.interServiceSecretExistingSecret }}
             - name: AXIOM_INTER_SERVICE_SECRET
               valueFrom:

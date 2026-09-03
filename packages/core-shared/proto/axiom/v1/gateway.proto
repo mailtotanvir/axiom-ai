@@ -32,6 +32,22 @@ message ChatCompletionRequest {
   TenantContext tenant = 20;
 }
 
+// Dedicated request for the streaming RPC: buf STANDARD lint requires a
+// unique request type per RPC. Fields mirror ChatCompletionRequest.
+message ChatCompletionStreamRequest {
+  string model = 1;
+  repeated ChatMessage messages = 2;
+  repeated ToolDefinition tools = 3;
+  optional double temperature = 4;
+  optional double top_p = 5;
+  optional uint32 max_tokens = 6;
+  repeated string stop_sequences = 7;
+  bool stream = 8;
+  string request_id = 9;
+  // Verified tenant context; never accepted from callers.
+  TenantContext tenant = 20;
+}
+
 message Usage {
   uint32 prompt_tokens = 1;
   uint32 completion_tokens = 2;
@@ -47,7 +63,7 @@ message ChatCompletionResponse {
   string finish_reason = 6;
 }
 
-message StreamChunk {
+message ChatCompletionStreamResponse {
   string id = 1;
   string model = 2;
   int64 created = 3;
@@ -79,6 +95,6 @@ message TenantContext {
 
 service GatewayService {
   rpc ChatCompletion(ChatCompletionRequest) returns (ChatCompletionResponse);
-  rpc ChatCompletionStream(ChatCompletionRequest) returns (stream StreamChunk);
+  rpc ChatCompletionStream(ChatCompletionStreamRequest) returns (stream ChatCompletionStreamResponse);
   rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
 }

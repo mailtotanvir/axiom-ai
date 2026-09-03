@@ -5,7 +5,7 @@ package axiom.v1;
 // Observability control plane: trace query surface over ClickHouse.
 // Span *ingest* uses standard OTLP; this proto exposes Axiom-specific queries.
 
-message TraceQuery {
+message QueryTraceRequest {
   string trace_id = 1;
   optional string tenant_id = 2;
   int64 since_unix = 3;
@@ -28,7 +28,7 @@ message LlmSpan {
   optional double cost_usd = 23;
 }
 
-message TraceQueryResponse {
+message QueryTraceResponse {
   repeated LlmSpan spans = 1;
 }
 
@@ -42,5 +42,5 @@ message EvalResult {
 }
 
 service TelemetryService {
-  rpc QueryTrace(TraceQuery) returns (TraceQueryResponse);
+  rpc QueryTrace(QueryTraceRequest) returns (QueryTraceResponse);
 }
