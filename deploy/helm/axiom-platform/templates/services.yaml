@@ -28,9 +28,14 @@ spec:
         prometheus.io/path: /metrics
     spec:
       # Hardened defaults: images already run as non-root (node / nobody).
-      # runAsUser is deliberately unset so each image keeps its own UID.
+      # runAsUser/Group >10000 (KSV-0020/0021) overrides the image USER;
+      # root-owned image files stay readable (644/755) and all writes go
+      # to the /tmp emptyDir below (fsGroup-owned).
       securityContext:
         runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
       containers:

@@ -10,3 +10,22 @@
 # the prisma 7 upgrade. Unreachable at runtime.
 # exp: 2027-03-01
 CVE-2026-40345
+
+# AVD-KSV-0110 (workloads in the default namespace): the chart deliberately
+# leaves namespace unset so `helm install -n <env>` scopes releases per
+# environment; hardcoding a namespace would break multi-env installs.
+# Namespace governance belongs to cluster admission policy.
+AVD-KSV-0110
+
+# AVD-KSV-0125 (images from untrusted registries): the registry is an
+# install-time value (global.imageRegistry, default ghcr.io); it cannot be
+# resolved statically by design. Allowed registries belong to cluster
+# admission policy.
+AVD-KSV-0125
+
+# AVD-DS-0026 (no HEALTHCHECK in Dockerfiles): liveness/readiness is defined
+# at the orchestration layer (probes in this Helm chart, healthchecks in
+# docker-compose for infra, `make smoke` for dev). A Dockerfile-level check
+# would duplicate that and cannot be parameterized across the four services
+# sharing one Dockerfile without new build args.
+AVD-DS-0026
