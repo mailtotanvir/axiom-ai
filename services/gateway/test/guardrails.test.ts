@@ -46,7 +46,7 @@ describe("Gateway Guardrails", () => {
         messages: [
           {
             role: "user",
-            content: "Here is my secret key: sk-abcdef1234567890abcdef1234567890",
+            content: "Here is my secret key: sk-abcdef1234567890abcdef1234567890", // gitleaks:allow - synthetic fixture asserting redaction
           },
         ],
       };

@@ -1,0 +1,11 @@
+# Gitleaks ignore file: fingerprints of known synthetic test fixtures.
+# Each is a FAKE credential used to assert redaction/scrubbing behavior;
+# none is a real secret and none ever leaves the test process.
+# (Same lines also carry inline `gitleaks:allow` comments so the exemption
+# survives line shifts; this file is the exact-match backstop.)
+# Do not add real secrets here — rotate them instead.
+packages/core-shared/test/secrets.test.ts:stripe-access-token:35
+packages/core-shared/test/secrets.test.ts:generic-api-key:76
+packages/core-shared/test/secrets.test.ts:generic-api-key:101
+services/gateway/test/guardrails.test.ts:generic-api-key:49
+services/ops-observability/test/billing.test.ts:stripe-access-token:88

@@ -85,7 +85,7 @@ describe("billing routes", () => {
     AXIOM_ENV: "test" as const,
     AXIOM_INTER_SERVICE_SECRET: "test-secret",
     AXIOM_BILLING_ENABLED: "true",
-    STRIPE_SECRET_KEY: "sk_test_placeholder",
+    STRIPE_SECRET_KEY: "sk_test_placeholder", // gitleaks:allow - placeholder enabling tests, not a credential
   };
 
   function makeSync(): BillingSync {

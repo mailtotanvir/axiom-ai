@@ -32,7 +32,7 @@ describe("scrubText", () => {
 
   it("redacts AWS access keys and stripe keys", () => {
     expect(scrubText("AKIAIOSFODNN7EXAMPLE")).toContain(REDACTED);
-    expect(scrubText("sk_test_abcdefghijklmnopqr")).toContain(REDACTED);
+    expect(scrubText("sk_test_abcdefghijklmnopqr")).toContain(REDACTED); // gitleaks:allow - synthetic fixture asserting redaction
   });
 
   it("redacts PEM private key blocks", () => {
@@ -73,7 +73,7 @@ describe("scrubObject", () => {
       tenantId: "t-1",
       request: {
         headers: { authorization: "Bearer xyz", "x-api-key": "key-123" },
-        config: { apiKey: "sk-proj-abcdefgh1234567890ab" },
+        config: { apiKey: "sk-proj-abcdefgh1234567890ab" }, // gitleaks:allow - synthetic fixture asserting redaction
       },
     });
     expect(JSON.stringify(out)).not.toContain("sk-proj-abcdefgh1234567890ab");
@@ -98,7 +98,7 @@ describe("createSafeLogger", () => {
     const logger = createSafeLogger({ write: (line) => lines.push(line) });
     logger.info("upstream rejected request", {
       authorization: "Bearer live-secret",
-      apiKey: "sk-proj-abcdefgh1234567890ab",
+      apiKey: "sk-proj-abcdefgh1234567890ab", // gitleaks:allow - synthetic fixture asserting redaction
       detail: "Bearer fallback-token-123456",
       tenant: "t-1",
     });
