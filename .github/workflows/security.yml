@@ -58,6 +58,8 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
+          scanners: vuln,misconfig
+          trivyignores: .trivyignore
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: "true"
@@ -93,6 +95,8 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: axiom-local/${{ matrix.image }}:ci
+          scanners: vuln
+          trivyignores: .trivyignore
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: "true"

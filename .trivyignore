@@ -1,0 +1,12 @@
+# Trivy ignore file. Each entry needs a justification; re-review on expiry.
+# Auto-loaded for filesystem scans from the repo root; image scans receive
+# it explicitly via `trivyignores:` in .github/workflows/security.yml.
+
+# CVE-2026-40345 (deepmerge-ts 7.1.5, stack exhaustion on recursive merges).
+# Dev-only transitive dep: prisma CLI (@prisma/config) used at build time to
+# generate the client. Never shipped: devDependencies are pruned from runtime
+# images and it is absent from all production bundles. The only fixed release
+# is breaking-major 8.x, which prisma 6 pins against (exact 7.1.5); revisit on
+# the prisma 7 upgrade. Unreachable at runtime.
+# exp: 2027-03-01
+CVE-2026-40345

@@ -5,6 +5,7 @@ help: ## Show available targets
 
 install: ## Install TS workspaces + Python venv
 	npm install --no-audit --no-fund
+	npx prisma generate --schema services/ops-observability/prisma/schema.prisma
 	cd services/rag-pipeline && \
 		python3 -m venv .venv && \
 		.venv/bin/pip install -q -r requirements.txt -r requirements-dev.txt

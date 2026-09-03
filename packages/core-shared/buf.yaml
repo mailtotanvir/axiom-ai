@@ -1,7 +1,7 @@
 version: v2
 modules:
   - path: proto
-name: buf.build/axiom-ai/core
+    name: buf.build/axiom-ai/core
 lint:
   use:
     - STANDARD
